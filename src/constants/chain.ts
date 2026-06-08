@@ -1,20 +1,23 @@
 export const ARC_CHAIN = {
   testnet: {
-    chainId: 50312,
-    name: 'Somnia Testnet',
-    rpc: 'https://dream-rpc.somnia.network',
-    explorer: 'https://somnia-testnet.socialscan.io',
-  },
-  mainnet: {
     chainId: 5042002,
-    name: 'Arc Mainnet',
-    rpc: 'https://rpc.arc.network',
-    explorer: 'https://explorer.arc.network',
+    name: 'Arc Testnet',
+    // Primary + fallback RPC endpoints
+    rpc: 'https://rpc.testnet.arc.network',
+    rpcFallbacks: [
+      'https://rpc.blockdaemon.testnet.arc.network',
+      'https://rpc.quicknode.testnet.arc.network',
+    ],
+    explorer: 'https://testnet.arcscan.app',
+    faucet: 'https://faucet.circle.com',
+    // USDC is the native gas token on Arc (18 decimals — not ERC-20)
+    nativeCurrency: { name: 'USDC', symbol: 'USDC', decimals: 18 },
   },
 } as const;
 
-export const USDC_ADDRESS = '0x28BEc7E30E6faee657a03e19Bf1128AaD7632A00';
-
-export const ACTIVE_NETWORK: 'testnet' | 'mainnet' = 'testnet';
-
+export const ACTIVE_NETWORK = 'testnet' as const;
 export const CHAIN = ARC_CHAIN[ACTIVE_NETWORK];
+
+// USDC is native on Arc — no ERC-20 contract needed for basic transfers.
+// Decimals: 18 (Arc) vs 6 (standard USDC on Ethereum/Base)
+export const USDC_DECIMALS = 18;
