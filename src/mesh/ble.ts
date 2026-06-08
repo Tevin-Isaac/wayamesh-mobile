@@ -1,21 +1,42 @@
-import { BleManager, Device, BleError } from 'react-native-ble-plx';
 import { Platform, PermissionsAndroid } from 'react-native';
 import { logMeshRelay } from '@/db/queries';
+
+// react-native-ble-plx is a native module — not available in Expo Go.
+// We load it lazily so the app runs in Expo Go without crashing.
+// In a real dev/production build the full native implementation is used.
+type BleManagerType = import('react-native-ble-plx').BleManager;
+type DeviceType = import('react-native-ble-plx').Device;
 
 const SERVICE_UUID = 'c0de0001-cafe-beef-dead-0000wayamesh';
 const TX_CHAR_UUID = 'c0de0002-cafe-beef-dead-0000wayamesh';
 const CHUNK_SIZE = 512;
 
-let manager: BleManager | null = null;
+let _manager: BleManagerType | null = null;
+let _bleAvailable: boolean | null = null;
 
-export function getBleManager(): BleManager {
-  if (!manager) {
-    manager = new BleManager();
+function isBleAvailable(): boolean {
+  if (_bleAvailable !== null) return _bleAvailable;
+  try {
+    require('react-native-ble-plx');
+    _bleAvailable = true;
+  } catch {
+    _bleAvailable = false;
   }
-  return manager;
+  return _bleAvailable;
+}
+
+function getBleManager(): BleManagerType | null {
+  if (!isBleAvailable()) return null;
+  if (!_manager) {
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const { BleManager } = require('react-native-ble-plx');
+    _manager = new BleManager();
+  }
+  return _manager;
 }
 
 export async function requestBlePermissions(): Promise<boolean> {
+  if (!isBleAvailable()) return false;
   if (Platform.OS === 'android') {
     const grants = await PermissionsAndroid.requestMultiple([
       PermissionsAndroid.PERMISSIONS.BLUETOOTH_SCAN,
@@ -28,9 +49,13 @@ export async function requestBlePermissions(): Promise<boolean> {
   return true;
 }
 
-export function scanForPeers(onPeer: (device: Device) => void): () => void {
+export function scanForPeers(onPeer: (device: DeviceType) => void): () => void {
   const ble = getBleManager();
-  ble.startDeviceScan([SERVICE_UUID], null, (error: BleError | null, device: Device | null) => {
+  if (!ble) {
+    console.log('[BLE] Not available in Expo Go — scan skipped');
+    return () => {};
+  }
+  ble.startDeviceScan([SERVICE_UUID], null, (error: unknown, device: DeviceType | null) => {
     if (error || !device) return;
     onPeer(device);
   });
@@ -43,6 +68,10 @@ export async function relayTransaction(
   peerId: string,
 ): Promise<void> {
   const ble = getBleManager();
+  if (!ble) {
+    console.log('[BLE] Not available in Expo Go — relay skipped');
+    return;
+  }
 
   try {
     const device = await ble.connectToDevice(peerId);
@@ -57,11 +86,15 @@ export async function relayTransaction(
     logMeshRelay(txHash, peerId);
     await device.cancelConnection();
   } catch {
-    // Peer moved out of range, silently skip
+    // Peer moved out of range
   }
 }
 
 export function destroyBleManager(): void {
-  manager?.destroy();
-  manager = null;
+  _manager?.destroy();
+  _manager = null;
+}
+
+export function bleIsAvailable(): boolean {
+  return isBleAvailable();
 }

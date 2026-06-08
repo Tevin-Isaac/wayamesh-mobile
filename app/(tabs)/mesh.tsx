@@ -1,21 +1,25 @@
 import { useState, useEffect } from 'react';
 import { View, Text, FlatList, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Device } from 'react-native-ble-plx';
-import { requestBlePermissions, scanForPeers } from '@/mesh/ble';
+import { requestBlePermissions, scanForPeers, bleIsAvailable } from '@/mesh/ble';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { COLORS, SPACING } from '@/constants/theme';
 
+interface PeerDevice {
+  id: string;
+  name: string | null;
+  rssi: number | null;
+}
+
 export default function MeshScreen() {
   const [scanning, setScanning] = useState(false);
-  const [peers, setPeers] = useState<Device[]>([]);
+  const [peers, setPeers] = useState<PeerDevice[]>([]);
   const [stopScan, setStopScan] = useState<(() => void) | null>(null);
+  const bleAvailable = bleIsAvailable();
 
   useEffect(() => {
-    return () => {
-      stopScan?.();
-    };
+    return () => { stopScan?.(); };
   }, [stopScan]);
 
   async function toggleScan() {
@@ -35,7 +39,7 @@ export default function MeshScreen() {
     const stop = scanForPeers((device) => {
       setPeers((prev) => {
         if (prev.find((d) => d.id === device.id)) return prev;
-        return [...prev, device];
+        return [...prev, { id: device.id, name: device.name ?? null, rssi: device.rssi ?? null }];
       });
     });
 
@@ -51,16 +55,32 @@ export default function MeshScreen() {
         ListHeaderComponent={
           <View>
             <Text style={styles.heading}>Mesh Network</Text>
+
+            {!bleAvailable && (
+              <Card style={styles.warningCard}>
+                <Text style={styles.warningTitle}>BLE not available</Text>
+                <Text style={styles.warningText}>
+                  Bluetooth mesh requires a development build.{'\n'}
+                  Run{' '}
+                  <Text style={styles.code}>eas build --platform android</Text>
+                  {' '}to enable it.
+                </Text>
+              </Card>
+            )}
+
             <Card style={styles.statusCard} accent={scanning}>
               <Text style={styles.statusLabel}>{scanning ? 'Scanning for peers...' : 'Mesh offline'}</Text>
               <Text style={styles.peerCount}>{peers.length} peer{peers.length !== 1 ? 's' : ''} found</Text>
             </Card>
+
             <Button
               title={scanning ? 'Stop Scan' : 'Scan for Peers'}
               variant={scanning ? 'secondary' : 'primary'}
               onPress={toggleScan}
+              disabled={!bleAvailable}
               style={styles.scanBtn}
             />
+
             {peers.length > 0 && <Text style={styles.peersHeader}>Nearby Peers</Text>}
           </View>
         }
@@ -68,7 +88,7 @@ export default function MeshScreen() {
           <Card style={styles.peerCard}>
             <Text style={styles.peerId}>{item.name ?? 'Unknown device'}</Text>
             <Text style={styles.peerMeta}>{item.id}</Text>
-            {item.rssi && <Text style={styles.peerRssi}>Signal: {item.rssi} dBm</Text>}
+            {item.rssi !== null && <Text style={styles.peerRssi}>Signal: {item.rssi} dBm</Text>}
           </Card>
         )}
         ListEmptyComponent={
@@ -88,6 +108,10 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: COLORS.bg },
   list: { padding: SPACING.lg, gap: SPACING.sm },
   heading: { fontSize: 28, fontWeight: '700', color: COLORS.text, marginBottom: SPACING.md },
+  warningCard: { marginBottom: SPACING.md, borderColor: COLORS.warning },
+  warningTitle: { fontSize: 14, color: COLORS.warning, fontWeight: '700', marginBottom: 4 },
+  warningText: { fontSize: 13, color: COLORS.textMuted, lineHeight: 20 },
+  code: { fontFamily: 'monospace', color: COLORS.accent },
   statusCard: { marginBottom: SPACING.md },
   statusLabel: { fontSize: 14, color: COLORS.textMuted, marginBottom: 4 },
   peerCount: { fontSize: 24, fontWeight: '700', color: COLORS.text },
