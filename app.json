@@ -50,6 +50,13 @@
           "faceIDPermission": "Wayamesh uses Face ID to protect your wallet."
         }
       ]
-    ]
+    ],
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "de5243ef-44ee-472f-8322-f928b3013f0a"
+      }
+    },
+    "owner": "tevinprime66"
   }
 }
