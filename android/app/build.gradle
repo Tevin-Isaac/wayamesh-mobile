@@ -87,9 +87,9 @@ android {
     buildToolsVersion rootProject.ext.buildToolsVersion
     compileSdk rootProject.ext.compileSdkVersion
 
-    namespace "com.wayameshtmp"
+    namespace "com.wayamesh.mobile"
     defaultConfig {
-        applicationId "com.wayameshtmp"
+        applicationId "com.wayamesh.mobile"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 1
