@@ -38,6 +38,7 @@
       ]
     },
     "scheme": "wayamesh",
+    "platforms": ["ios", "android"],
     "plugins": [
       "expo-router",
       "expo-sqlite",
