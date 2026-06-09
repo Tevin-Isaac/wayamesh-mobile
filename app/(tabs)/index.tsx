@@ -1,5 +1,6 @@
-import { View, Text, StyleSheet, ScrollView, RefreshControl, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, RefreshControl, TouchableOpacity, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import * as Clipboard from 'expo-clipboard';
 import { router } from 'expo-router';
 import { useWallet } from '@/hooks/useWallet';
 import { useTransactions } from '@/hooks/useTransactions';
@@ -60,9 +61,10 @@ export default function WalletScreen() {
           <TouchableOpacity
             style={styles.secondaryBtn}
             activeOpacity={0.7}
-            onPress={() => {
+            onPress={async () => {
               if (address) {
-                // copy to clipboard (no extra dep needed, use RN Share)
+                await Clipboard.setStringAsync(address);
+                Alert.alert('Copied', 'Wallet address copied to clipboard');
               }
             }}
           >
