@@ -40,8 +40,8 @@ export async function estimateGas(
     const provider = getRpcProvider();
     const value = ethers.parseUnits(amountUsdc, USDC_DECIMALS);
     const gas = await provider.estimateGas({ from, to, value });
-    // Arc gas price is very low — estimate a worst-case fee in USDC
-    const gasPrice = ethers.parseUnits('0.001', 'gwei');
+    // Arc minimum base fee is 20 Gwei — use 40 Gwei for safe estimate
+    const gasPrice = ethers.parseUnits('40', 'gwei');
     const fee = gas * gasPrice;
     return `~${ethers.formatUnits(fee, USDC_DECIMALS)} USDC`;
   } catch {
@@ -62,10 +62,11 @@ export async function buildOfflineTransfer(
     value,
     chainId: CHAIN.chainId,
     nonce,
-    // Conservative gas limit for a native transfer on Arc
+    // Arc min base fee: 20 Gwei. Use 40 Gwei (2x buffer) for offline signing safety.
+    // Priority fee is 0 — Arc docs confirm this is fine under normal conditions.
     gasLimit: 21_000n,
-    maxFeePerGas: ethers.parseUnits('0.01', 'gwei'),
-    maxPriorityFeePerGas: ethers.parseUnits('0.001', 'gwei'),
+    maxFeePerGas: ethers.parseUnits('40', 'gwei'),
+    maxPriorityFeePerGas: 0n,
     type: 2,
   };
 

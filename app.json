@@ -39,7 +39,6 @@
     },
     "scheme": "wayamesh",
     "plugins": [
-      "expo-dev-client",
       "expo-router",
       "expo-sqlite",
       "expo-secure-store",
