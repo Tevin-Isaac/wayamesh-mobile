@@ -1,28 +1,35 @@
 import { useEffect, useState } from 'react';
-import { Stack } from 'expo-router';
+import { Stack, useRootNavigationState, router } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
-import { router } from 'expo-router';
 import { initDatabase } from '@/db/schema';
 import { hasWallet } from '@/wallet/keystore';
 import { COLORS } from '@/constants/theme';
 
 export default function RootLayout() {
-  const [ready, setReady] = useState(false);
+  const [dbReady, setDbReady] = useState(false);
+  const [walletExists, setWalletExists] = useState<boolean | null>(null);
+  const navigationState = useRootNavigationState();
 
   useEffect(() => {
     async function bootstrap() {
       await initDatabase();
-      const walletExists = await hasWallet();
-      if (!walletExists) {
-        router.replace('/onboarding');
-      } else {
-        router.replace('/(tabs)');
-      }
-      setReady(true);
+      const exists = await hasWallet();
+      setWalletExists(exists);
+      setDbReady(true);
     }
     bootstrap();
   }, []);
+
+  // Navigate only after both the navigator is mounted AND the DB check is done
+  useEffect(() => {
+    if (!navigationState?.key || !dbReady || walletExists === null) return;
+    if (walletExists) {
+      router.replace('/(tabs)');
+    } else {
+      router.replace('/onboarding');
+    }
+  }, [navigationState?.key, dbReady, walletExists]);
 
   return (
     <SafeAreaProvider>
