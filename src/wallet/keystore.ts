@@ -8,13 +8,35 @@ const KEY_STORE_KEY = 'wayamesh_encrypted_pk';
 export async function createWallet(): Promise<{ address: string; publicKey: string }> {
   const wallet = ethers.Wallet.createRandom();
 
-  // Store private key encrypted in SecureStore (hardware-backed on device)
   await SecureStore.setItemAsync(KEY_STORE_KEY, wallet.privateKey, {
     requireAuthentication: false,
     keychainAccessible: SecureStore.AFTER_FIRST_UNLOCK,
   });
 
-  // Save wallet metadata to SQLite (no private key stored in DB)
+  saveWallet({
+    address: wallet.address,
+    public_key: wallet.publicKey,
+    encrypted_key: '[SecureStore]',
+  });
+
+  return { address: wallet.address, publicKey: wallet.publicKey };
+}
+
+export async function importWallet(
+  privateKeyOrMnemonic: string,
+): Promise<{ address: string; publicKey: string }> {
+  const trimmed = privateKeyOrMnemonic.trim();
+  const wordCount = trimmed.split(/\s+/).length;
+
+  const wallet = wordCount >= 12
+    ? ethers.Wallet.fromPhrase(trimmed)
+    : new ethers.Wallet(trimmed);
+
+  await SecureStore.setItemAsync(KEY_STORE_KEY, wallet.privateKey, {
+    requireAuthentication: false,
+    keychainAccessible: SecureStore.AFTER_FIRST_UNLOCK,
+  });
+
   saveWallet({
     address: wallet.address,
     public_key: wallet.publicKey,
@@ -44,6 +66,10 @@ export async function hasWallet(): Promise<boolean> {
   if (!row) return false;
   const key = await SecureStore.getItemAsync(KEY_STORE_KEY);
   return key !== null;
+}
+
+export async function deleteWallet(): Promise<void> {
+  await SecureStore.deleteItemAsync(KEY_STORE_KEY);
 }
 
 export async function biometricAvailable(): Promise<boolean> {

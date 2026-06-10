@@ -5,15 +5,21 @@ import { router } from 'expo-router';
 import { useWallet } from '@/hooks/useWallet';
 import { useTransactions } from '@/hooks/useTransactions';
 import { Card } from '@/components/ui/Card';
-import { COLORS, SPACING } from '@/constants/theme';
+import { COLORS, SPACING, RADIUS } from '@/constants/theme';
 
 export default function WalletScreen() {
   const { address, balance, isLoading, refresh } = useWallet();
   const { pendingCount } = useTransactions();
 
   const short = address
-    ? `${address.slice(0, 8)}...${address.slice(-6)}`
+    ? `${address.slice(0, 10)}...${address.slice(-8)}`
     : '—';
+
+  async function copyAddress() {
+    if (!address) return;
+    await Clipboard.setStringAsync(address);
+    Alert.alert('Copied', 'Wallet address copied to clipboard');
+  }
 
   return (
     <SafeAreaView style={styles.container}>
@@ -29,57 +35,71 @@ export default function WalletScreen() {
       >
         <Text style={styles.heading}>Wallet</Text>
 
+        {/* Balance card */}
         <Card accent style={styles.balanceCard}>
           <Text style={styles.balanceLabel}>USDC Balance</Text>
           <Text style={styles.balance}>
-            {balance ? Number(balance).toFixed(4) : '—'}
+            {isLoading ? '…' : balance ? Number(balance).toFixed(4) : '0.0000'}
           </Text>
           <Text style={styles.balanceCurrency}>USDC · Arc Testnet</Text>
-          <Text style={styles.address}>{short}</Text>
+
+          <TouchableOpacity onPress={copyAddress} activeOpacity={0.6} style={styles.addressRow}>
+            <Text style={styles.address}>{short}</Text>
+            <Text style={styles.copyHint}>tap to copy</Text>
+          </TouchableOpacity>
         </Card>
 
+        {/* Pending settlement banner */}
         {pendingCount > 0 && (
           <Card style={styles.pendingCard}>
             <Text style={styles.pendingText}>
-              {pendingCount} transaction{pendingCount > 1 ? 's' : ''} pending settlement
+              {pendingCount} tx pending settlement
             </Text>
             <Text style={styles.pendingHint}>
-              Relaying via BLE · will settle on Arc when online
+              Relaying via BLE · settles on Arc when online
             </Text>
           </Card>
         )}
 
+        {/* Action buttons */}
         <View style={styles.actions}>
           <TouchableOpacity
-            style={styles.primaryBtn}
+            style={styles.actionBtn}
             onPress={() => router.push('/send')}
             activeOpacity={0.85}
           >
-            <Text style={styles.primaryBtnText}>Send USDC</Text>
+            <Text style={styles.actionIcon}>↑</Text>
+            <Text style={styles.actionLabel}>Send</Text>
           </TouchableOpacity>
 
           <TouchableOpacity
-            style={styles.secondaryBtn}
-            activeOpacity={0.7}
-            onPress={async () => {
-              if (address) {
-                await Clipboard.setStringAsync(address);
-                Alert.alert('Copied', 'Wallet address copied to clipboard');
-              }
-            }}
+            style={styles.actionBtn}
+            onPress={() => router.push('/receive')}
+            activeOpacity={0.85}
           >
-            <Text style={styles.secondaryBtnText}>Copy Address</Text>
+            <Text style={styles.actionIcon}>↓</Text>
+            <Text style={styles.actionLabel}>Receive</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.actionBtn}
+            onPress={copyAddress}
+            activeOpacity={0.85}
+          >
+            <Text style={styles.actionIcon}>⎘</Text>
+            <Text style={styles.actionLabel}>Copy</Text>
           </TouchableOpacity>
         </View>
 
+        {/* Faucet */}
         <View style={styles.faucetRow}>
           <Text style={styles.faucetText}>
             Need testnet USDC?{' '}
             <Text
               style={styles.faucetLink}
-              onPress={() => router.push('/send')}
+              onPress={() => router.push('/receive')}
             >
-              faucet.circle.com
+              Get from faucet.circle.com
             </Text>
           </Text>
         </View>
@@ -114,12 +134,22 @@ const styles = StyleSheet.create({
   balanceCurrency: {
     fontSize: 12,
     color: COLORS.accent,
-    marginBottom: SPACING.sm,
+    marginBottom: SPACING.md,
+  },
+  addressRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
   },
   address: {
     fontSize: 12,
     color: COLORS.textMuted,
     fontFamily: 'monospace',
+  },
+  copyHint: {
+    fontSize: 10,
+    color: COLORS.textDim,
+    textDecorationLine: 'underline',
   },
   pendingCard: {
     marginBottom: SPACING.lg,
@@ -132,34 +162,32 @@ const styles = StyleSheet.create({
     marginBottom: 2,
   },
   pendingHint: { fontSize: 12, color: COLORS.textMuted },
-  actions: { gap: SPACING.sm, marginBottom: SPACING.lg },
-  primaryBtn: {
-    backgroundColor: COLORS.accent,
-    borderRadius: 14,
-    paddingVertical: 16,
-    alignItems: 'center',
-    shadowColor: COLORS.accent,
-    shadowOpacity: 0.3,
-    shadowRadius: 12,
-    elevation: 6,
+  actions: {
+    flexDirection: 'row',
+    gap: SPACING.sm,
+    marginBottom: SPACING.lg,
   },
-  primaryBtnText: {
-    color: COLORS.bg,
-    fontWeight: '700',
-    fontSize: 16,
-  },
-  secondaryBtn: {
-    borderRadius: 14,
-    paddingVertical: 14,
+  actionBtn: {
+    flex: 1,
+    backgroundColor: COLORS.surface,
+    borderRadius: RADIUS.lg,
+    paddingVertical: SPACING.lg,
     alignItems: 'center',
     borderWidth: 1,
     borderColor: COLORS.border,
+    gap: 6,
   },
-  secondaryBtnText: {
-    color: COLORS.textMuted,
-    fontSize: 15,
+  actionIcon: {
+    fontSize: 22,
+    color: COLORS.accent,
+    fontWeight: '300',
+  },
+  actionLabel: {
+    fontSize: 13,
+    color: COLORS.text,
+    fontWeight: '600',
   },
   faucetRow: { alignItems: 'center', marginTop: SPACING.md },
-  faucetText: { fontSize: 12, color: COLORS.textDim },
+  faucetText: { fontSize: 12, color: COLORS.textDim, textAlign: 'center' },
   faucetLink: { color: COLORS.accent, textDecorationLine: 'underline' },
 });

@@ -317,10 +317,10 @@ export default function OnboardingScreen() {
 
           <TouchableOpacity
             style={styles.secondaryBtn}
-            onPress={() => router.replace('/(tabs)')}
+            onPress={() => router.push('/import')}
             activeOpacity={0.7}
           >
-            <Text style={styles.secondaryBtnText}>I already have a wallet</Text>
+            <Text style={styles.secondaryBtnText}>Import existing wallet</Text>
           </TouchableOpacity>
         </View>
 

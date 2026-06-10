@@ -48,6 +48,28 @@ export default function RootLayout() {
             headerShadowVisible: false,
           }}
         />
+        <Stack.Screen
+          name="receive"
+          options={{
+            presentation: 'modal',
+            headerShown: true,
+            headerTitle: 'Receive USDC',
+            headerStyle: { backgroundColor: COLORS.surface },
+            headerTintColor: COLORS.text,
+            headerShadowVisible: false,
+          }}
+        />
+        <Stack.Screen
+          name="import"
+          options={{
+            presentation: 'modal',
+            headerShown: true,
+            headerTitle: 'Import Wallet',
+            headerStyle: { backgroundColor: COLORS.surface },
+            headerTintColor: COLORS.text,
+            headerShadowVisible: false,
+          }}
+        />
       </Stack>
     </SafeAreaProvider>
   );

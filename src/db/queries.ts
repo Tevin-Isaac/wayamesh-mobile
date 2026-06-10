@@ -42,6 +42,14 @@ export function getWallet(): WalletRow | null {
   return db.getFirstSync<WalletRow>('SELECT * FROM wallets LIMIT 1');
 }
 
+export function clearWalletData(): void {
+  const db = getDb();
+  db.runSync('DELETE FROM wallets');
+  db.runSync('DELETE FROM transactions');
+  db.runSync('DELETE FROM mesh_relays');
+  db.runSync('UPDATE sync_log SET last_block_synced = 0, last_sync_time = 0 WHERE id = 1');
+}
+
 // Transaction queries
 export function saveTransaction(tx: Omit<TransactionRow, 'created_at' | 'settled_at' | 'arc_tx_hash'>): void {
   const db = getDb();
