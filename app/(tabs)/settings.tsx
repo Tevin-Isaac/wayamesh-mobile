@@ -1,13 +1,21 @@
-import { View, Text, StyleSheet, Switch, Alert, ScrollView } from 'react-native';
+import {
+  View, Text, StyleSheet, Switch, Alert, ScrollView,
+  TouchableOpacity, Modal, FlatList,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { router } from 'expo-router';
 import { Card } from '@/components/ui/Card';
 import { StatRow } from '@/components/ui/StatRow';
 import { Button } from '@/components/ui/Button';
-import { COLORS, SPACING } from '@/constants/theme';
+import { COLORS, SPACING, RADIUS } from '@/constants/theme';
 import { CHAINS, ACTIVE_CHAIN } from '@/constants/chain';
 import { useWallet } from '@/hooks/useWallet';
+import {
+  getPreferences, setBiometric, setAutoSettle, setLanguage,
+} from '@/utils/preferences';
+import { SUPPORTED_LANGUAGES, type LanguageCode } from '@/i18n';
+import i18n from '@/i18n';
 
 const Divider = () => <View style={styles.divider} />;
 
@@ -17,10 +25,45 @@ function Eyebrow({ children }: { children: string }) {
 
 export default function SettingsScreen() {
   const { logout, address } = useWallet();
-  const [biometric, setBiometric] = useState(true);
-  const [autoSettle, setAutoSettle] = useState(true);
+
+  const [biometric,   setBiometricState]  = useState(true);
+  const [autoSettle,  setAutoSettleState] = useState(true);
+  const [langCode,    setLangCode]        = useState<LanguageCode>('en');
+  const [langPicker,  setLangPicker]      = useState(false);
+
+  // Load persisted preferences on mount
+  useEffect(() => {
+    try {
+      const prefs = getPreferences();
+      setBiometricState(prefs.biometric_enabled);
+      setAutoSettleState(prefs.auto_settle_enabled);
+      setLangCode(prefs.language as LanguageCode);
+    } catch {
+      // DB not ready yet — defaults are fine
+    }
+  }, []);
 
   const short = address ? `${address.slice(0, 10)}…${address.slice(-8)}` : '—';
+
+  function handleBiometric(val: boolean) {
+    setBiometricState(val);
+    setBiometric(val);
+  }
+
+  function handleAutoSettle(val: boolean) {
+    setAutoSettleState(val);
+    setAutoSettle(val);
+  }
+
+  async function handleSelectLanguage(code: LanguageCode) {
+    setLangCode(code);
+    setLanguage(code);
+    await i18n.changeLanguage(code);
+    setLangPicker(false);
+  }
+
+  const currentLang = SUPPORTED_LANGUAGES.find(l => l.code === langCode)
+    ?? SUPPORTED_LANGUAGES[0];
 
   function confirmLogout() {
     Alert.alert(
@@ -89,12 +132,26 @@ export default function SettingsScreen() {
             control={
               <Switch
                 value={biometric}
-                onValueChange={setBiometric}
+                onValueChange={handleBiometric}
                 trackColor={{ false: COLORS.border, true: COLORS.accent }}
                 thumbColor={COLORS.text}
               />
             }
           />
+        </Card>
+
+        {/* Language */}
+        <Eyebrow>Language</Eyebrow>
+        <Card style={styles.card}>
+          <TouchableOpacity
+            style={styles.langRow}
+            onPress={() => setLangPicker(true)}
+            activeOpacity={0.7}
+          >
+            <Text style={styles.langFlag}>{currentLang.flag}</Text>
+            <Text style={styles.langName}>{currentLang.name}</Text>
+            <Text style={styles.langChevron}>›</Text>
+          </TouchableOpacity>
         </Card>
 
         {/* Network */}
@@ -105,7 +162,7 @@ export default function SettingsScreen() {
             control={
               <Switch
                 value={autoSettle}
-                onValueChange={setAutoSettle}
+                onValueChange={handleAutoSettle}
                 trackColor={{ false: COLORS.border, true: COLORS.accent }}
                 thumbColor={COLORS.text}
               />
@@ -160,6 +217,46 @@ export default function SettingsScreen() {
           Removes wallet from this device. Restore it later with your seed phrase.
         </Text>
       </ScrollView>
+
+      {/* Language picker modal */}
+      <Modal
+        visible={langPicker}
+        animationType="slide"
+        presentationStyle="pageSheet"
+        onRequestClose={() => setLangPicker(false)}
+      >
+        <SafeAreaView style={styles.modalContainer}>
+          <View style={styles.modalHeader}>
+            <Text style={styles.modalTitle}>Language</Text>
+            <TouchableOpacity onPress={() => setLangPicker(false)} activeOpacity={0.7}>
+              <Text style={styles.modalClose}>Done</Text>
+            </TouchableOpacity>
+          </View>
+          <FlatList
+            data={SUPPORTED_LANGUAGES}
+            keyExtractor={item => item.code}
+            ItemSeparatorComponent={() => <View style={styles.divider} />}
+            renderItem={({ item }) => (
+              <TouchableOpacity
+                style={styles.langOption}
+                onPress={() => handleSelectLanguage(item.code as LanguageCode)}
+                activeOpacity={0.7}
+              >
+                <Text style={styles.langOptionFlag}>{item.flag}</Text>
+                <Text style={[
+                  styles.langOptionName,
+                  item.code === langCode && styles.langOptionActive,
+                ]}>
+                  {item.name}
+                </Text>
+                {item.code === langCode && (
+                  <Text style={styles.langOptionCheck}>✓</Text>
+                )}
+              </TouchableOpacity>
+            )}
+          />
+        </SafeAreaView>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -180,6 +277,14 @@ const styles = StyleSheet.create({
     textAlign: 'center', marginTop: SPACING.sm, lineHeight: 18,
   },
 
+  langRow: {
+    flexDirection: 'row', alignItems: 'center',
+    paddingVertical: SPACING.sm, gap: SPACING.sm,
+  },
+  langFlag:    { fontSize: 22 },
+  langName:    { flex: 1, fontSize: 15, fontWeight: '500', color: COLORS.text },
+  langChevron: { fontSize: 20, color: COLORS.textMuted },
+
   chainRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 2 },
   chainInfo: { flex: 1, gap: 2 },
   chainName: { fontSize: 14, fontWeight: '600', color: COLORS.text },
@@ -195,4 +300,23 @@ const styles = StyleSheet.create({
   chainBadgeText:     { fontSize: 11, fontWeight: '600' },
   chainBadgeTextActive: { color: COLORS.accent },
   chainBadgeTextSoon:   { color: COLORS.textDim },
+
+  // Language modal
+  modalContainer: { flex: 1, backgroundColor: COLORS.bg },
+  modalHeader: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    paddingHorizontal: SPACING.lg, paddingVertical: SPACING.md,
+    borderBottomWidth: 1, borderBottomColor: COLORS.border,
+  },
+  modalTitle: { fontSize: 18, fontWeight: '700', color: COLORS.text },
+  modalClose: { fontSize: 16, color: COLORS.accent, fontWeight: '600' },
+
+  langOption: {
+    flexDirection: 'row', alignItems: 'center', gap: SPACING.md,
+    paddingHorizontal: SPACING.lg, paddingVertical: 16,
+  },
+  langOptionFlag: { fontSize: 26 },
+  langOptionName: { flex: 1, fontSize: 16, color: COLORS.text },
+  langOptionActive: { color: COLORS.accent, fontWeight: '600' },
+  langOptionCheck: { fontSize: 18, color: COLORS.accent, fontWeight: '700' },
 });

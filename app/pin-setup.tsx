@@ -4,6 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { useWallet } from '@/hooks/useWallet';
 import { saveBackup } from '@/wallet/backup';
+import { getWallet } from '@/db/queries';
 import { COLORS, SPACING, RADIUS } from '@/constants/theme';
 
 const PIN_LENGTH = 6;
@@ -36,7 +37,11 @@ export default function PinSetupScreen() {
     }
     setLoading(true);
     try {
-      await saveBackup(address!, value);
+      // Read address directly from SQLite — avoids async hook timing race
+      const walletRow = getWallet();
+      const walletAddress = address ?? walletRow?.address;
+      if (!walletAddress) throw new Error('Wallet not found — please try again');
+      await saveBackup(walletAddress, value);
       router.replace('/(tabs)');
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : 'Backup failed — try again');

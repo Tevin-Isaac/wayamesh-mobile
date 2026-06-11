@@ -3,10 +3,13 @@ import { AppState } from 'react-native';
 import { Stack, useRootNavigationState, router } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { I18nextProvider } from 'react-i18next';
 import { initDatabase } from '@/db/schema';
 import { hasWallet } from '@/wallet/keystore';
 import { backupExists } from '@/wallet/backup';
 import { settlePendingTransactions } from '@/wallet/transactions';
+import { getPreferences } from '@/utils/preferences';
+import i18n from '@/i18n';
 import { COLORS } from '@/constants/theme';
 
 const MODAL_HEADER = {
@@ -26,6 +29,15 @@ export default function RootLayout() {
   useEffect(() => {
     async function bootstrap() {
       await initDatabase();
+      // Load persisted language preference
+      try {
+        const prefs = getPreferences();
+        if (prefs.language && prefs.language !== i18n.language) {
+          await i18n.changeLanguage(prefs.language);
+        }
+      } catch {
+        // Ignore — DB may not have preferences row yet
+      }
       const exists = await hasWallet();
       setWalletExists(exists);
       // If no wallet but a backup exists on device, land on restore screen
@@ -54,11 +66,18 @@ export default function RootLayout() {
     }
   }, [navigationState?.key, dbReady, walletExists]);
 
-  // Auto-settle pending transactions when app comes to foreground
+  // Auto-settle pending transactions when app comes to foreground (if enabled)
   useEffect(() => {
     const sub = AppState.addEventListener('change', nextState => {
       if (appState.current !== 'active' && nextState === 'active') {
-        settlePendingTransactions().catch(() => {});
+        try {
+          const prefs = getPreferences();
+          if (prefs.auto_settle_enabled) {
+            settlePendingTransactions().catch(() => {});
+          }
+        } catch {
+          settlePendingTransactions().catch(() => {});
+        }
       }
       appState.current = nextState;
     });
@@ -66,6 +85,7 @@ export default function RootLayout() {
   }, []);
 
   return (
+    <I18nextProvider i18n={i18n}>
     <SafeAreaProvider>
       <StatusBar style="light" backgroundColor={COLORS.bg} />
       <Stack screenOptions={{ headerShown: false }}>
@@ -109,5 +129,6 @@ export default function RootLayout() {
         />
       </Stack>
     </SafeAreaProvider>
+    </I18nextProvider>
   );
 }

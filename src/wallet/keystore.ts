@@ -2,6 +2,7 @@ import * as SecureStore from 'expo-secure-store';
 import * as LocalAuthentication from 'expo-local-authentication';
 import { ethers } from 'ethers';
 import { saveWallet, getWallet, type WalletRow } from '@/db/queries';
+import { getPreferences } from '@/utils/preferences';
 
 const KEY_STORE_KEY = 'wayamesh_encrypted_pk';
 const MNEMONIC_KEY  = 'wayamesh_mnemonic';
@@ -17,6 +18,13 @@ const SECURE_OPTS: SecureStore.SecureStoreOptions = {
 // ── Biometric gate ────────────────────────────────────────────────────────────
 
 async function biometricGate(message: string): Promise<void> {
+  // Skip if user has disabled biometric unlock in settings
+  try {
+    const prefs = getPreferences();
+    if (!prefs.biometric_enabled) return;
+  } catch {
+    // DB may not be ready yet; default to requiring biometric
+  }
   const result = await LocalAuthentication.authenticateAsync({
     promptMessage: message,
     fallbackLabel: 'Use passcode',

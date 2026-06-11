@@ -69,5 +69,15 @@ export async function initDatabase(): Promise<void> {
 
     INSERT OR IGNORE INTO pin_security (id, attempt_count, locked_until)
     VALUES (1, 0, 0);
+
+    CREATE TABLE IF NOT EXISTS preferences (
+      id INTEGER PRIMARY KEY CHECK (id = 1),
+      biometric_enabled INTEGER NOT NULL DEFAULT 1,
+      auto_settle_enabled INTEGER NOT NULL DEFAULT 1,
+      language TEXT NOT NULL DEFAULT 'en'
+    );
+
+    INSERT OR IGNORE INTO preferences (id, biometric_enabled, auto_settle_enabled, language)
+    VALUES (1, 1, 1, 'en');
   `);
 }
