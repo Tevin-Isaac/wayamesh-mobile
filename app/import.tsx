@@ -1,16 +1,34 @@
 import { useState } from 'react';
 import {
-  View, Text, TextInput, StyleSheet,
-  Alert, KeyboardAvoidingView, Platform, TouchableOpacity,
+  View, Text, StyleSheet,
+  Alert, KeyboardAvoidingView, Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { useWallet } from '@/hooks/useWallet';
+import { Input } from '@/components/ui/Input';
+import { Button } from '@/components/ui/Button';
+import { Card } from '@/components/ui/Card';
 import { COLORS, SPACING, RADIUS } from '@/constants/theme';
+import { Ionicons } from '@expo/vector-icons';
 
 export default function ImportScreen() {
   const { importExisting, isLoading } = useWallet();
   const [value, setValue] = useState('');
+
+  const wordCount  = value.trim().split(/\s+/).filter(Boolean).length;
+  const isMnemonic = wordCount >= 12;
+  const isPk       = value.trim().startsWith('0x') || /^[0-9a-fA-F]{64}$/.test(value.trim());
+
+  const hint = !value.trim()
+    ? 'Enter your private key (0x…) or 12/24-word seed phrase'
+    : isPk
+    ? 'Private key detected'
+    : isMnemonic
+    ? `Seed phrase detected (${wordCount} words)`
+    : `${wordCount} word${wordCount !== 1 ? 's' : ''} — need 12 or 24`;
+
+  const hintActive = !!value.trim() && (isPk || isMnemonic);
 
   async function handleImport() {
     const trimmed = value.trim();
@@ -18,73 +36,58 @@ export default function ImportScreen() {
       Alert.alert('Required', 'Enter a private key or seed phrase');
       return;
     }
-
     try {
       await importExisting(trimmed);
       Alert.alert(
         'Wallet imported',
-        'Your wallet has been restored successfully.',
-        [{ text: 'Continue', onPress: () => router.replace('/(tabs)') }],
+        'Your wallet has been restored. Set a PIN to protect your cloud backup.',
+        [{ text: 'Set PIN', onPress: () => router.replace('/pin-setup') }],
       );
-    } catch {
-      Alert.alert('Invalid', 'Could not import wallet. Check your private key or seed phrase and try again.');
+    } catch (e: unknown) {
+      Alert.alert('Invalid', e instanceof Error ? e.message : 'Could not import wallet. Check your input and try again.');
     }
   }
 
-  const wordCount = value.trim().split(/\s+/).filter(Boolean).length;
-  const isMnemonic = wordCount >= 12;
-  const hint = value.trim().startsWith('0x')
-    ? 'Private key detected'
-    : isMnemonic
-    ? `Seed phrase detected (${wordCount} words)`
-    : 'Enter your private key (0x…) or 12/24-word seed phrase';
-
   return (
     <SafeAreaView style={styles.container} edges={['bottom']}>
-      <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        style={styles.kav}
-      >
+      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.kav}>
         <View style={styles.content}>
           <Text style={styles.description}>
             Restore an existing wallet using its private key or seed phrase. Your key never leaves this device.
           </Text>
 
-          <Text style={styles.label}>Private Key or Seed Phrase</Text>
-          <TextInput
-            style={styles.input}
+          <Input
+            label="Private Key or Seed Phrase"
             value={value}
             onChangeText={setValue}
             placeholder="0x… or word1 word2 word3 …"
-            placeholderTextColor={COLORS.textDim}
             multiline
+            numberOfLines={4}
             autoCapitalize="none"
             autoCorrect={false}
-            secureTextEntry={false}
-            numberOfLines={4}
+            mono
+            hint={hint}
+            hintActive={hintActive}
+            style={styles.textarea}
           />
-          <Text style={[styles.hint, value && (isMnemonic || value.startsWith('0x')) && styles.hintActive]}>
-            {hint}
-          </Text>
 
-          <View style={styles.warningBox}>
-            <Text style={styles.warningText}>
-              Never share your private key or seed phrase with anyone.
-            </Text>
-          </View>
+          <Card tone="error" style={styles.warningCard}>
+            <View style={styles.warningRow}>
+              <Ionicons name="warning-outline" size={16} color={COLORS.error} />
+              <Text style={styles.warningText}>
+                Never share your private key or seed phrase with anyone.
+              </Text>
+            </View>
+          </Card>
         </View>
 
         <View style={styles.footer}>
-          <TouchableOpacity
-            style={[styles.importBtn, (!value.trim() || isLoading) && styles.disabled]}
+          <Button
+            title={isLoading ? 'Importing…' : 'Import Wallet'}
             onPress={handleImport}
+            loading={isLoading}
             disabled={!value.trim() || isLoading}
-            activeOpacity={0.85}
-          >
-            <Text style={styles.importBtnText}>
-              {isLoading ? 'Importing...' : 'Import Wallet'}
-            </Text>
-          </TouchableOpacity>
+          />
         </View>
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -93,69 +96,12 @@ export default function ImportScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: COLORS.bg },
-  kav: { flex: 1 },
-  content: { flex: 1, padding: SPACING.lg },
-  description: {
-    fontSize: 14,
-    color: COLORS.textMuted,
-    lineHeight: 22,
-    marginBottom: SPACING.lg,
-  },
-  label: {
-    fontSize: 13,
-    color: COLORS.textMuted,
-    marginBottom: SPACING.xs,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-  },
-  input: {
-    backgroundColor: COLORS.surface,
-    borderWidth: 1,
-    borderColor: COLORS.border,
-    borderRadius: RADIUS.md,
-    padding: SPACING.md,
-    color: COLORS.text,
-    fontSize: 14,
-    fontFamily: 'monospace',
-    minHeight: 100,
-    textAlignVertical: 'top',
-  },
-  hint: {
-    fontSize: 12,
-    color: COLORS.textDim,
-    marginTop: SPACING.xs,
-  },
-  hintActive: {
-    color: COLORS.accent,
-  },
-  warningBox: {
-    backgroundColor: 'rgba(255, 77, 106, 0.08)',
-    borderRadius: RADIUS.sm,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 77, 106, 0.2)',
-    padding: SPACING.md,
-    marginTop: SPACING.lg,
-  },
-  warningText: {
-    fontSize: 13,
-    color: COLORS.error,
-    lineHeight: 20,
-  },
+  kav:       { flex: 1 },
+  content:   { flex: 1, padding: SPACING.lg, gap: SPACING.lg },
+  description: { fontSize: 14, color: COLORS.textMuted, lineHeight: 22 },
+  textarea:  { minHeight: 110, textAlignVertical: 'top', paddingTop: SPACING.md },
+  warningCard: { padding: SPACING.md },
+  warningRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 8 },
+  warningText: { flex: 1, fontSize: 13, color: COLORS.error, lineHeight: 20 },
   footer: { padding: SPACING.lg, paddingTop: 0 },
-  importBtn: {
-    backgroundColor: COLORS.accent,
-    borderRadius: RADIUS.md,
-    paddingVertical: 16,
-    alignItems: 'center',
-    shadowColor: COLORS.accent,
-    shadowOpacity: 0.3,
-    shadowRadius: 12,
-    elevation: 6,
-  },
-  disabled: { opacity: 0.4 },
-  importBtnText: {
-    color: COLORS.bg,
-    fontWeight: '700',
-    fontSize: 16,
-  },
 });

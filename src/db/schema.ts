@@ -55,5 +55,19 @@ export async function initDatabase(): Promise<void> {
     );
 
     INSERT OR IGNORE INTO sync_log (id, last_block_synced, last_sync_time) VALUES (1, 0, 0);
+
+    CREATE TABLE IF NOT EXISTS nonce_cache (
+      address TEXT PRIMARY KEY,
+      local_nonce INTEGER NOT NULL DEFAULT 0
+    );
+
+    CREATE TABLE IF NOT EXISTS pin_security (
+      id INTEGER PRIMARY KEY CHECK (id = 1),
+      attempt_count INTEGER NOT NULL DEFAULT 0,
+      locked_until INTEGER NOT NULL DEFAULT 0
+    );
+
+    INSERT OR IGNORE INTO pin_security (id, attempt_count, locked_until)
+    VALUES (1, 0, 0);
   `);
 }

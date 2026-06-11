@@ -1,38 +1,26 @@
-import { View, Text, StyleSheet, Switch, TouchableOpacity, Alert, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, Switch, Alert, ScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useState } from 'react';
 import { router } from 'expo-router';
 import { Card } from '@/components/ui/Card';
-import { COLORS, SPACING, RADIUS } from '@/constants/theme';
-import { CHAIN, ACTIVE_NETWORK } from '@/constants/chain';
+import { StatRow } from '@/components/ui/StatRow';
+import { Button } from '@/components/ui/Button';
+import { COLORS, SPACING } from '@/constants/theme';
+import { CHAINS, ACTIVE_CHAIN } from '@/constants/chain';
 import { useWallet } from '@/hooks/useWallet';
 
-function SettingRow({
-  label,
-  value,
-  onToggle,
-}: {
-  label: string;
-  value: boolean;
-  onToggle: (v: boolean) => void;
-}) {
-  return (
-    <View style={styles.settingRow}>
-      <Text style={styles.settingLabel}>{label}</Text>
-      <Switch
-        value={value}
-        onValueChange={onToggle}
-        trackColor={{ false: COLORS.border, true: COLORS.accent }}
-        thumbColor={COLORS.text}
-      />
-    </View>
-  );
+const Divider = () => <View style={styles.divider} />;
+
+function Eyebrow({ children }: { children: string }) {
+  return <Text style={styles.eyebrow}>{children}</Text>;
 }
 
 export default function SettingsScreen() {
   const { logout, address } = useWallet();
   const [biometric, setBiometric] = useState(true);
   const [autoSettle, setAutoSettle] = useState(true);
+
+  const short = address ? `${address.slice(0, 10)}…${address.slice(-8)}` : '—';
 
   function confirmLogout() {
     Alert.alert(
@@ -52,84 +40,124 @@ export default function SettingsScreen() {
     );
   }
 
-  const short = address ? `${address.slice(0, 10)}...${address.slice(-8)}` : '—';
-
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView contentContainerStyle={styles.content}>
         <Text style={styles.heading}>Settings</Text>
 
-        {/* Wallet info */}
-        <Text style={styles.section}>Wallet</Text>
+        {/* Wallet */}
+        <Eyebrow>Wallet</Eyebrow>
         <Card style={styles.card}>
-          <View style={styles.infoRow}>
-            <Text style={styles.infoLabel}>Address</Text>
-            <Text style={[styles.infoValue, styles.mono]} numberOfLines={1}>{short}</Text>
-          </View>
-          <View style={styles.divider} />
-          <TouchableOpacity
-            style={styles.actionRow}
+          <StatRow label="Address" value={short} mono />
+          <Divider />
+          <StatRow
+            label="Receive USDC"
+            accent chevron
             onPress={() => router.push('/receive')}
-            activeOpacity={0.7}
-          >
-            <Text style={styles.actionLabel}>Receive USDC</Text>
-            <Text style={styles.chevron}>›</Text>
-          </TouchableOpacity>
+          />
+          <Divider />
+          <StatRow
+            label="Backup Seed Phrase"
+            accent chevron
+            onPress={() => router.push('/backup')}
+          />
+        </Card>
+
+        {/* Recovery */}
+        <Eyebrow>Recovery</Eyebrow>
+        <Card style={styles.card}>
+          <StatRow
+            label="Cloud Backup"
+            value="Encrypted · PIN protected"
+            accent chevron
+            onPress={() => router.push('/pin-setup')}
+          />
+          <Divider />
+          <StatRow
+            label="Guardian Recovery"
+            value="2-of-3 Shamir shards"
+            accent chevron
+            onPress={() => router.push('/guardian-setup')}
+          />
         </Card>
 
         {/* Security */}
-        <Text style={styles.section}>Security</Text>
+        <Eyebrow>Security</Eyebrow>
         <Card style={styles.card}>
-          <SettingRow label="Biometric unlock" value={biometric} onToggle={setBiometric} />
+          <StatRow
+            label="Biometric unlock"
+            control={
+              <Switch
+                value={biometric}
+                onValueChange={setBiometric}
+                trackColor={{ false: COLORS.border, true: COLORS.accent }}
+                thumbColor={COLORS.text}
+              />
+            }
+          />
         </Card>
 
         {/* Network */}
-        <Text style={styles.section}>Network</Text>
+        <Eyebrow>Network</Eyebrow>
         <Card style={styles.card}>
-          <SettingRow label="Auto-settle when online" value={autoSettle} onToggle={setAutoSettle} />
-          <View style={styles.divider} />
-          <View style={styles.infoRow}>
-            <Text style={styles.infoLabel}>Network</Text>
-            <Text style={styles.infoValue}>
-              {ACTIVE_NETWORK === 'testnet' ? 'Testnet' : 'Mainnet'}
-            </Text>
-          </View>
-          <View style={styles.infoRow}>
-            <Text style={styles.infoLabel}>Chain ID</Text>
-            <Text style={styles.infoValue}>{CHAIN.chainId}</Text>
-          </View>
-          <View style={styles.infoRow}>
-            <Text style={styles.infoLabel}>RPC</Text>
-            <Text style={[styles.infoValue, styles.mono]} numberOfLines={1}>
-              {CHAIN.rpc}
-            </Text>
-          </View>
+          <StatRow
+            label="Auto-settle when online"
+            control={
+              <Switch
+                value={autoSettle}
+                onValueChange={setAutoSettle}
+                trackColor={{ false: COLORS.border, true: COLORS.accent }}
+                thumbColor={COLORS.text}
+              />
+            }
+          />
+          <Divider />
+          <StatRow label="Chain ID" value={String(ACTIVE_CHAIN.chainId)} mono />
+          <StatRow label="RPC"      value={ACTIVE_CHAIN.rpc.replace('https://', '')} mono />
+        </Card>
+
+        {/* USDC Networks */}
+        <Eyebrow>USDC Networks</Eyebrow>
+        <Card style={styles.card}>
+          {Object.values(CHAINS).map((chain, i, arr) => (
+            <View key={chain.id}>
+              <View style={styles.chainRow}>
+                <View style={styles.chainInfo}>
+                  <Text style={[styles.chainName, !chain.enabled && styles.chainNameDim]}>
+                    {chain.name}
+                  </Text>
+                  <Text style={styles.chainMeta}>
+                    {chain.usdc.type === 'native' ? 'Native USDC' : `ERC-20 · ${chain.usdc.decimals}dp`}
+                    {chain.testnet ? ' · Testnet' : ''}
+                  </Text>
+                </View>
+                <View style={[styles.chainBadge, chain.enabled ? styles.chainBadgeActive : styles.chainBadgeSoon]}>
+                  <Text style={[styles.chainBadgeText, chain.enabled ? styles.chainBadgeTextActive : styles.chainBadgeTextSoon]}>
+                    {chain.enabled ? 'Active' : 'Soon'}
+                  </Text>
+                </View>
+              </View>
+              {i < arr.length - 1 && <Divider />}
+            </View>
+          ))}
         </Card>
 
         {/* About */}
-        <Text style={styles.section}>About</Text>
+        <Eyebrow>About</Eyebrow>
         <Card style={styles.card}>
-          <View style={styles.infoRow}>
-            <Text style={styles.infoLabel}>Version</Text>
-            <Text style={styles.infoValue}>1.0.0</Text>
-          </View>
-          <View style={styles.infoRow}>
-            <Text style={styles.infoLabel}>Built with</Text>
-            <Text style={styles.infoValue}>Expo · Arc · ethers.js</Text>
-          </View>
+          <StatRow label="Version"    value="1.0.0" />
+          <StatRow label="Built with" value="Expo · Arc · ethers.js" />
         </Card>
 
-        {/* Danger zone */}
-        <Text style={styles.section}>Account</Text>
-        <TouchableOpacity
-          style={styles.logoutBtn}
+        {/* Sign out */}
+        <Eyebrow>Account</Eyebrow>
+        <Button
+          title="Sign Out"
+          variant="danger"
           onPress={confirmLogout}
-          activeOpacity={0.8}
-        >
-          <Text style={styles.logoutText}>Sign Out</Text>
-        </TouchableOpacity>
-        <Text style={styles.logoutHint}>
-          Removes wallet from this device. You can restore it later with your seed phrase.
+        />
+        <Text style={styles.signOutHint}>
+          Removes wallet from this device. Restore it later with your seed phrase.
         </Text>
       </ScrollView>
     </SafeAreaView>
@@ -138,69 +166,33 @@ export default function SettingsScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: COLORS.bg },
-  content: { padding: SPACING.lg, paddingBottom: SPACING.xxl },
-  heading: {
-    fontSize: 28,
-    fontWeight: '700',
-    color: COLORS.text,
-    marginBottom: SPACING.lg,
+  content:   { padding: SPACING.lg, paddingBottom: SPACING.xxl },
+  heading:   { fontSize: 28, fontWeight: '700', color: COLORS.text, marginBottom: SPACING.lg, letterSpacing: -0.3 },
+  eyebrow: {
+    fontSize: 11, fontWeight: '600', color: COLORS.textMuted,
+    textTransform: 'uppercase', letterSpacing: 1,
+    marginBottom: SPACING.sm, marginTop: SPACING.md,
   },
-  section: {
-    fontSize: 12,
-    color: COLORS.textMuted,
-    textTransform: 'uppercase',
-    letterSpacing: 1,
-    marginBottom: SPACING.sm,
-    marginTop: SPACING.md,
+  card:    { gap: SPACING.sm, marginBottom: SPACING.xs },
+  divider: { height: 1, backgroundColor: COLORS.border, marginVertical: 4 },
+  signOutHint: {
+    fontSize: 12, color: COLORS.textDim,
+    textAlign: 'center', marginTop: SPACING.sm, lineHeight: 18,
   },
-  card: { gap: SPACING.sm },
-  settingRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+
+  chainRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 2 },
+  chainInfo: { flex: 1, gap: 2 },
+  chainName: { fontSize: 14, fontWeight: '600', color: COLORS.text },
+  chainNameDim: { color: COLORS.textMuted },
+  chainMeta: { fontSize: 11, color: COLORS.textDim },
+
+  chainBadge: {
+    paddingHorizontal: 8, paddingVertical: 3,
+    borderRadius: 6, borderWidth: 1,
   },
-  settingLabel: { fontSize: 15, color: COLORS.text },
-  divider: { height: 1, backgroundColor: COLORS.border },
-  infoRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  infoLabel: { fontSize: 14, color: COLORS.textMuted },
-  infoValue: { fontSize: 14, color: COLORS.text },
-  mono: {
-    fontFamily: 'monospace',
-    fontSize: 11,
-    flexShrink: 1,
-    marginLeft: SPACING.sm,
-    textAlign: 'right',
-  },
-  actionRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  actionLabel: { fontSize: 15, color: COLORS.accent },
-  chevron: { fontSize: 20, color: COLORS.textMuted },
-  logoutBtn: {
-    backgroundColor: 'rgba(255,77,106,0.1)',
-    borderRadius: RADIUS.md,
-    paddingVertical: 16,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: 'rgba(255,77,106,0.3)',
-    marginTop: SPACING.sm,
-  },
-  logoutText: {
-    color: COLORS.error,
-    fontWeight: '700',
-    fontSize: 16,
-  },
-  logoutHint: {
-    fontSize: 12,
-    color: COLORS.textDim,
-    textAlign: 'center',
-    marginTop: SPACING.sm,
-    lineHeight: 18,
-  },
+  chainBadgeActive: { backgroundColor: COLORS.accentSoft, borderColor: COLORS.accent },
+  chainBadgeSoon:   { backgroundColor: 'transparent', borderColor: COLORS.border },
+  chainBadgeText:     { fontSize: 11, fontWeight: '600' },
+  chainBadgeTextActive: { color: COLORS.accent },
+  chainBadgeTextSoon:   { color: COLORS.textDim },
 });
