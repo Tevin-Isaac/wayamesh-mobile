@@ -61,7 +61,7 @@ export default function ConfirmScreen() {
       <SafeAreaView style={styles.container} edges={['bottom']}>
         <View style={styles.center}>
           <ActivityIndicator color={COLORS.accent} size="large" />
-          <Text style={styles.loadingText}>Estimating gas fee…</Text>
+          <Text style={styles.loadingText}>Estimating network fee…</Text>
         </View>
       </SafeAreaView>
     );
@@ -147,11 +147,11 @@ export default function ConfirmScreen() {
             <Text style={styles.valueText}>{amountNum.toFixed(6)} USDC</Text>
           </Row>
           <Divider />
-          <Row label="Max gas fee">
+          <Row label="Network fee">
             {gas ? (
-              <Text style={styles.valueText}>{parseFloat(gas.totalFeeUsdc).toFixed(8)} USDC</Text>
+              <Text style={styles.valueText}>{parseFloat(gas.totalFeeUsdc).toFixed(6)} USDC</Text>
             ) : (
-              <Text style={styles.valueTextDim}>Offline — using ~0.00084 USDC estimate</Text>
+              <Text style={styles.valueTextDim}>Offline — using ~0.000840 USDC estimate</Text>
             )}
           </Row>
           <Divider />

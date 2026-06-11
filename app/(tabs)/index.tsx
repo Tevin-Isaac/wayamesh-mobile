@@ -1,4 +1,4 @@
-import { View, Text, StyleSheet, ScrollView, RefreshControl, TouchableOpacity, Alert } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, RefreshControl, TouchableOpacity, Alert, Linking } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { useWallet } from '@/hooks/useWallet';
@@ -104,8 +104,8 @@ export default function WalletScreen() {
 
         <Text style={styles.faucetText}>
           Need testnet USDC?{' '}
-          <Text style={styles.faucetLink} onPress={() => router.push('/receive')}>
-            Get from faucet.circle.com
+          <Text style={styles.faucetLink} onPress={() => Linking.openURL('https://faucet.circle.com')}>
+            Get 20 USDC free from Circle →
           </Text>
         </Text>
       </ScrollView>

@@ -1,9 +1,9 @@
-import { View, Text, StyleSheet, TouchableOpacity, Alert, Share } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Alert, Share, Linking } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as Clipboard from 'expo-clipboard';
 import QRCode from 'react-native-qrcode-svg';
-import { router } from 'expo-router';
 import { useWallet } from '@/hooks/useWallet';
+import { ACTIVE_CHAIN } from '@/constants/chain';
 import { COLORS, SPACING, RADIUS } from '@/constants/theme';
 
 export default function ReceiveScreen() {
@@ -31,7 +31,7 @@ export default function ReceiveScreen() {
         <View style={styles.qrCard}>
           {address ? (
             <QRCode
-              value={address}
+              value={`ethereum:${address}`}
               size={220}
               color={COLORS.text}
               backgroundColor={COLORS.surface}
@@ -57,7 +57,18 @@ export default function ReceiveScreen() {
           </TouchableOpacity>
         </View>
 
-        <Text style={styles.networkNote}>Arc Testnet · USDC native token</Text>
+        <Text style={styles.networkNote}>{ACTIVE_CHAIN.name} · USDC native token</Text>
+
+        <TouchableOpacity
+          onPress={() => Linking.openURL('https://faucet.circle.com')}
+          activeOpacity={0.7}
+          style={styles.faucetRow}
+        >
+          <Text style={styles.faucetText}>
+            Need testnet USDC?{' '}
+            <Text style={styles.faucetLink}>Get 20 USDC free from Circle's faucet →</Text>
+          </Text>
+        </TouchableOpacity>
       </View>
     </SafeAreaView>
   );
@@ -157,5 +168,9 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: COLORS.textDim,
     textAlign: 'center',
+    marginBottom: SPACING.md,
   },
+  faucetRow:  { paddingHorizontal: SPACING.md },
+  faucetText: { fontSize: 12, color: COLORS.textDim, textAlign: 'center', lineHeight: 18 },
+  faucetLink: { color: COLORS.accent, textDecorationLine: 'underline' },
 });

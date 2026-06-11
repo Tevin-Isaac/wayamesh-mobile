@@ -6,8 +6,8 @@
 // Flip `enabled: true` to unlock a chain in the UI when RPC + testing are ready.
 
 export type UsdcMode =
-  | { type: 'native'; decimals: number }
-  | { type: 'erc20'; contract: string; decimals: number };
+  | { type: 'native'; decimals: number; displayDecimals: number }
+  | { type: 'erc20'; contract: string; decimals: number; displayDecimals: number };
 
 export interface ChainConfig {
   id: string;
@@ -37,7 +37,8 @@ export const CHAINS: Record<string, ChainConfig> = {
       'https://rpc.quicknode.testnet.arc.network',
     ],
     explorer: 'https://testnet.arcscan.app',
-    usdc: { type: 'native', decimals: 18 },
+    // 18 decimals internally (wei-based), 6 display decimals (USDC standard)
+    usdc: { type: 'native', decimals: 18, displayDecimals: 6 },
     faucet: 'https://faucet.circle.com',
     testnet: true,
     enabled: true,
@@ -52,7 +53,7 @@ export const CHAINS: Record<string, ChainConfig> = {
     rpc: 'https://eth.llamarpc.com',
     rpcFallbacks: ['https://cloudflare-eth.com', 'https://rpc.ankr.com/eth'],
     explorer: 'https://etherscan.io',
-    usdc: { type: 'erc20', contract: '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48', decimals: 6 },
+    usdc: { type: 'erc20', contract: '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48', decimals: 6, displayDecimals: 6 },
     testnet: false,
     enabled: false,
   },
@@ -66,7 +67,7 @@ export const CHAINS: Record<string, ChainConfig> = {
     rpc: 'https://mainnet.base.org',
     rpcFallbacks: ['https://base.llamarpc.com', 'https://base-rpc.publicnode.com'],
     explorer: 'https://basescan.org',
-    usdc: { type: 'erc20', contract: '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913', decimals: 6 },
+    usdc: { type: 'erc20', contract: '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913', decimals: 6, displayDecimals: 6 },
     testnet: false,
     enabled: false,
   },
@@ -80,7 +81,7 @@ export const CHAINS: Record<string, ChainConfig> = {
     rpc: 'https://polygon-rpc.com',
     rpcFallbacks: ['https://polygon.llamarpc.com', 'https://polygon-bor-rpc.publicnode.com'],
     explorer: 'https://polygonscan.com',
-    usdc: { type: 'erc20', contract: '0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359', decimals: 6 },
+    usdc: { type: 'erc20', contract: '0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359', decimals: 6, displayDecimals: 6 },
     testnet: false,
     enabled: false,
   },
@@ -94,7 +95,7 @@ export const CHAINS: Record<string, ChainConfig> = {
     rpc: 'https://arb1.arbitrum.io/rpc',
     rpcFallbacks: ['https://arbitrum.llamarpc.com', 'https://arbitrum-one-rpc.publicnode.com'],
     explorer: 'https://arbiscan.io',
-    usdc: { type: 'erc20', contract: '0xaf88d065e77c8cC2239327C5EDb3A432268e5831', decimals: 6 },
+    usdc: { type: 'erc20', contract: '0xaf88d065e77c8cC2239327C5EDb3A432268e5831', decimals: 6, displayDecimals: 6 },
     testnet: false,
     enabled: false,
   },
@@ -108,7 +109,7 @@ export const CHAINS: Record<string, ChainConfig> = {
     rpc: 'https://mainnet.optimism.io',
     rpcFallbacks: ['https://optimism.llamarpc.com', 'https://optimism-rpc.publicnode.com'],
     explorer: 'https://optimistic.etherscan.io',
-    usdc: { type: 'erc20', contract: '0x0b2C639c533813f4Aa9D7837CAf62653d097Ff85', decimals: 6 },
+    usdc: { type: 'erc20', contract: '0x0b2C639c533813f4Aa9D7837CAf62653d097Ff85', decimals: 6, displayDecimals: 6 },
     testnet: false,
     enabled: false,
   },
