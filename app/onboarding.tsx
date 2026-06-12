@@ -86,7 +86,6 @@ export default function OnboardingScreen() {
             Send money{'\n'}
             <Text style={styles.headlineSerif}>off the grid.</Text>
           </Text>
-          <Text style={styles.tagline}>Peer-to-peer · Bluetooth mesh · Arc blockchain</Text>
         </View>
 
         {/* CTAs */}
@@ -109,8 +108,8 @@ const styles = StyleSheet.create({
   content: { flex: 1, justifyContent: 'space-between', paddingHorizontal: SPACING.lg, paddingTop: SPACING.lg, paddingBottom: SPACING.xl },
 
   brand: { alignItems: 'center', gap: SPACING.sm },
-  logo: { width: 168, height: 56 },
-  wordmark: { fontFamily: FONTS.sans, fontSize: 15, fontWeight: '800', color: COLORS.accent, letterSpacing: 7 },
+  logo: { width: 132, height: 44 },
+  wordmark: { fontFamily: FONTS.sans, fontSize: 14, fontWeight: '800', color: COLORS.accent, letterSpacing: 6 },
 
   middle: { alignItems: 'center', gap: SPACING.sm },
   hero: { width: 320, height: 210 },
@@ -123,7 +122,6 @@ const styles = StyleSheet.create({
 
   headline: { fontSize: 32, fontWeight: '800', color: COLORS.text, textAlign: 'center', lineHeight: 38, letterSpacing: -0.6 },
   headlineSerif: { fontFamily: FONTS.serif, fontWeight: '400', fontSize: 38, color: COLORS.text },
-  tagline: { fontSize: 13, color: COLORS.textMuted, textAlign: 'center' },
 
   ctas: { width: '100%', gap: SPACING.sm },
   primaryBtn: {
