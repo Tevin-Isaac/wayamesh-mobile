@@ -150,6 +150,10 @@ export default function RootLayout() {
           name="recover"
           options={{ presentation: 'modal', headerTitle: 'Recover with Guardians', ...MODAL_HEADER }}
         />
+        <Stack.Screen
+          name="smart-account"
+          options={{ presentation: 'modal', headerTitle: 'Smart Account (Beta)', ...MODAL_HEADER }}
+        />
       </Stack>
     </SafeAreaProvider>
     </I18nextProvider>

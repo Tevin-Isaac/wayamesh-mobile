@@ -167,6 +167,17 @@ export default function SettingsScreen() {
           </TouchableOpacity>
         </Card>
 
+        {/* Smart account (beta) */}
+        <Eyebrow>Gasless USDC (Beta)</Eyebrow>
+        <Card style={styles.card}>
+          <StatRow
+            label="Smart Account"
+            value="Pay gas in USDC"
+            accent chevron
+            onPress={() => router.push('/smart-account')}
+          />
+        </Card>
+
         {/* Network */}
         <Eyebrow>Network</Eyebrow>
         <Card style={styles.card}>

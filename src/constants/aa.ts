@@ -17,6 +17,7 @@ export interface AaConfig {
   entryPointVersion: '0.7';
   /** Circle Paymaster v0.7 contract — pays gas in USDC. */
   paymaster: string;
+  explorer: string;
   testnet: boolean;
 }
 
@@ -28,6 +29,7 @@ export const AA_NETWORKS: Record<AaNetworkKey, AaConfig> = {
     usdc: '0x036CbD53842c5426634e7929541eC2318f3dCF7e',
     entryPointVersion: '0.7',
     paymaster: '0x31BE08D380A21fc740883c0BC434FcFc88740b58',
+    explorer: 'https://sepolia.basescan.org',
     testnet: true,
   },
   // Same v0.7 paymaster address as Base Sepolia — Circle deploys it there too,
@@ -39,6 +41,7 @@ export const AA_NETWORKS: Record<AaNetworkKey, AaConfig> = {
     usdc: '0x3600000000000000000000000000000000000000',
     entryPointVersion: '0.7',
     paymaster: '0x31BE08D380A21fc740883c0BC434FcFc88740b58',
+    explorer: 'https://testnet.arcscan.app',
     testnet: true,
   },
   'base-mainnet': {
@@ -48,6 +51,7 @@ export const AA_NETWORKS: Record<AaNetworkKey, AaConfig> = {
     usdc: '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913',
     entryPointVersion: '0.7',
     paymaster: '0x6C973eBe80dCD8660841D4356bf15c32460271C9',
+    explorer: 'https://basescan.org',
     testnet: false,
   },
 };
