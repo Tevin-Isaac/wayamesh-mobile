@@ -104,7 +104,7 @@ export default function SendScreen() {
                 <Text style={styles.previewVal}>{shortAddr(displayTo)}</Text>
               </Text>
               <Text style={styles.previewNote}>
-                Gas fees shown on next screen · signed offline · relayed via BLE
+                Network fee shown next · signed offline · settles on Arc when you reconnect
               </Text>
             </Card>
           ) : null}

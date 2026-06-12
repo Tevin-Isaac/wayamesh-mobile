@@ -66,22 +66,41 @@ export default function RootLayout() {
     }
   }, [navigationState?.key, dbReady, walletExists]);
 
-  // Auto-settle pending transactions when app comes to foreground (if enabled)
+  // Auto-settle pending transactions (if enabled): on foreground AND on a periodic
+  // retry while the app is active, so a queued offline tx settles as soon as
+  // connectivity returns — not only when the user re-opens the app.
   useEffect(() => {
-    const sub = AppState.addEventListener('change', nextState => {
-      if (appState.current !== 'active' && nextState === 'active') {
-        try {
-          const prefs = getPreferences();
-          if (prefs.auto_settle_enabled) {
-            settlePendingTransactions().catch(() => {});
-          }
-        } catch {
-          settlePendingTransactions().catch(() => {});
-        }
+    function autoSettleEnabled(): boolean {
+      try {
+        return getPreferences().auto_settle_enabled;
+      } catch {
+        return true; // DB not ready — default to settling
       }
+    }
+
+    async function trySettle() {
+      if (!autoSettleEnabled()) return;
+      try {
+        await settlePendingTransactions();
+      } catch {
+        // offline / RPC down — the next tick retries
+      }
+    }
+
+    const sub = AppState.addEventListener('change', nextState => {
+      if (appState.current !== 'active' && nextState === 'active') trySettle();
       appState.current = nextState;
     });
-    return () => sub.remove();
+
+    // Retry every 30s while foregrounded; settlePendingTransactions is a no-op
+    // when nothing is pending, so this is cheap.
+    const timer = setInterval(() => {
+      if (AppState.currentState === 'active') trySettle();
+    }, 30_000);
+
+    trySettle(); // attempt once on mount
+
+    return () => { sub.remove(); clearInterval(timer); };
   }, []);
 
   return (

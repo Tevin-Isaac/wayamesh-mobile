@@ -77,7 +77,7 @@ export default function ConfirmScreen() {
           </View>
           <Text style={styles.successTitle}>Transaction signed</Text>
           <Text style={styles.successSub}>
-            Queued offline. It will relay over Bluetooth mesh and settle on Arc when you're online.
+            Signed and queued offline. It settles on Arc automatically as soon as your device is back online.
           </Text>
           {txHash && (
             <TouchableOpacity
@@ -170,8 +170,8 @@ export default function ConfirmScreen() {
             <Text style={styles.valueText}>~480ms finality on Arc</Text>
           </Row>
           <Divider />
-          <Row label="Relay method">
-            <Text style={styles.valueText}>Offline → BLE mesh → Arc</Text>
+          <Row label="Delivery">
+            <Text style={styles.valueText}>Signed offline → Arc when online</Text>
           </Row>
         </View>
 

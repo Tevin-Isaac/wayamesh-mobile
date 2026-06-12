@@ -188,15 +188,30 @@ export async function settleOnChain(
   }, chain);
 }
 
-export async function settlePendingTransactions(): Promise<void> {
+export interface SettleResult {
+  attempted: number;
+  settled: number;
+  failed: number;
+}
+
+/**
+ * Try to broadcast every pending transaction. Safe to call repeatedly — already
+ * settled txs are no longer pending, and re-broadcasting the same nonce is a
+ * harmless no-op on-chain. Returns counts so callers can decide whether to retry.
+ */
+export async function settlePendingTransactions(): Promise<SettleResult> {
   const pending = getPendingTransactions();
+  let settled = 0;
+  let failed  = 0;
   for (const tx of pending) {
     try {
       await settleOnChain(tx.raw_signed, tx.hash);
+      settled++;
     } catch {
-      // Silent — retried on next foreground / connectivity event
+      failed++; // offline / RPC down — retried on next tick or foreground
     }
   }
+  return { attempted: pending.length, settled, failed };
 }
 
 // ── Legacy compat ─────────────────────────────────────────────────────────────

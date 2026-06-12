@@ -7,9 +7,15 @@ import { logMeshRelay } from '@/db/queries';
 type BleManagerType = import('react-native-ble-plx').BleManager;
 type DeviceType = import('react-native-ble-plx').Device;
 
-const SERVICE_UUID = 'c0de0001-cafe-beef-dead-0000wayamesh';
-const TX_CHAR_UUID = 'c0de0002-cafe-beef-dead-0000wayamesh';
-const CHUNK_SIZE = 512;
+// Valid 128-bit UUIDs (8-4-4-4-12 hex). The previous values contained the
+// non-hex string "wayamesh" and would throw the moment startDeviceScan ran on a
+// real build. These are stable, app-specific identifiers.
+const SERVICE_UUID = 'c0de0001-cafe-beef-dead-000000000001';
+const TX_CHAR_UUID = 'c0de0002-cafe-beef-dead-000000000002';
+
+// BLE characteristic writes are small; we frame the signed tx as length-prefixed
+// chunks so the receiving peer can reassemble and verify completeness.
+const CHUNK_SIZE = 180; // safe below the 185-byte default ATT MTU payload
 
 let _manager: BleManagerType | null = null;
 let _bleAvailable: boolean | null = null;
@@ -62,31 +68,53 @@ export function scanForPeers(onPeer: (device: DeviceType) => void): () => void {
   return () => ble.stopDeviceScan();
 }
 
+/**
+ * Relay a signed transaction to a nearby peer over BLE (central → peripheral).
+ *
+ * Each write is a self-describing JSON frame {h,i,n,d} so the receiver can
+ * reassemble in order and confirm it has all n chunks before broadcasting.
+ *
+ * NOTE: this is the SENDING (central) half. A peer can only *receive* a relay if
+ * it runs a GATT server / advertises as a peripheral — which react-native-ble-plx
+ * does not support. Bidirectional mesh requires a peripheral transport (a native
+ * BLE-peripheral module on Android, or Nearby Connections / MultipeerConnectivity).
+ * Until that lands, relayTransaction is a no-op against non-existent peers; the
+ * working settlement path is the sender's own device reconnecting (see
+ * settlePendingTransactions).
+ */
 export async function relayTransaction(
   rawSigned: string,
   txHash: string,
   peerId: string,
-): Promise<void> {
+): Promise<boolean> {
   const ble = getBleManager();
   if (!ble) {
     console.log('[BLE] Not available in Expo Go — relay skipped');
-    return;
+    return false;
   }
 
   try {
     const device = await ble.connectToDevice(peerId);
     await device.discoverAllServicesAndCharacteristics();
 
-    const payload = Buffer.from(rawSigned, 'utf8');
-    for (let i = 0; i < payload.length; i += CHUNK_SIZE) {
-      const chunk = payload.slice(i, i + CHUNK_SIZE).toString('base64');
-      await device.writeCharacteristicWithResponseForService(SERVICE_UUID, TX_CHAR_UUID, chunk);
+    const data   = Buffer.from(rawSigned, 'utf8').toString('base64');
+    const chunks = Math.ceil(data.length / CHUNK_SIZE);
+    for (let i = 0; i < chunks; i++) {
+      const frame = JSON.stringify({
+        h: txHash,
+        i,
+        n: chunks,
+        d: data.slice(i * CHUNK_SIZE, (i + 1) * CHUNK_SIZE),
+      });
+      const encoded = Buffer.from(frame, 'utf8').toString('base64');
+      await device.writeCharacteristicWithResponseForService(SERVICE_UUID, TX_CHAR_UUID, encoded);
     }
 
     logMeshRelay(txHash, peerId);
     await device.cancelConnection();
+    return true;
   } catch {
-    // Peer moved out of range
+    return false; // peer out of range / no GATT server
   }
 }
 
