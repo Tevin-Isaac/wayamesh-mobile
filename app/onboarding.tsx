@@ -4,6 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import Svg, { Path, Circle, Rect, Defs, RadialGradient, Stop, Text as SvgText } from 'react-native-svg';
 import { useWallet } from '@/hooks/useWallet';
+import { MeshBackground } from '@/components/pro/MeshBackground';
 import { COLORS, SPACING, RADIUS, FONTS } from '@/constants/theme';
 
 // Transfer arc — quadratic bezier the USDC coin travels.
@@ -42,6 +43,7 @@ export default function OnboardingScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
+      <MeshBackground />
       <Animated.View style={[styles.content, { opacity: fade }]}>
 
         {/* top: W logo + WAYAMESH wordmark */}
