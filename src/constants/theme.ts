@@ -25,7 +25,10 @@ export const COLORS = {
 
 export const FONTS = {
   sans: 'System',
-  mono: 'SpaceMono',
+  mono: 'SpaceMono_400Regular',
+  monoBold: 'SpaceMono_700Bold',
+  // Editorial italic accent used on Pro hero words ("off the grid")
+  serif: 'InstrumentSerif_400Regular_Italic',
 } as const;
 
 export const SPACING = {

@@ -1,54 +1,65 @@
 import {
   View, Text, StyleSheet, Switch, Alert, ScrollView,
-  TouchableOpacity, Modal, FlatList,
+  TouchableOpacity, Modal, FlatList, Linking,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useState, useEffect } from 'react';
 import { router } from 'expo-router';
-import { Card } from '@/components/ui/Card';
-import { StatRow } from '@/components/ui/StatRow';
-import { Button } from '@/components/ui/Button';
-import { COLORS, SPACING, RADIUS } from '@/constants/theme';
-import { CHAINS, ACTIVE_CHAIN } from '@/constants/chain';
+import { Ionicons } from '@expo/vector-icons';
+import { Avatar, Eyebrow } from '@/components/pro';
+import { Badge } from '@/components/ui/Badge';
+import { COLORS, SPACING, RADIUS, FONTS } from '@/constants/theme';
+import { ACTIVE_CHAIN } from '@/constants/chain';
 import { useWallet } from '@/hooks/useWallet';
 import { setKeyAuthBinding } from '@/wallet/keystore';
-import {
-  getPreferences, setBiometric, setAutoSettle, setLanguage,
-} from '@/utils/preferences';
+import { getPreferences, setBiometric, setAutoSettle, setLanguage } from '@/utils/preferences';
 import { SUPPORTED_LANGUAGES, type LanguageCode } from '@/i18n';
 import i18n from '@/i18n';
 
-const Divider = () => <View style={styles.divider} />;
+type IconName = keyof typeof Ionicons.glyphMap;
 
-function Eyebrow({ children }: { children: string }) {
-  return <Text style={styles.eyebrow}>{children}</Text>;
+function Row({
+  icon, label, value, control, chevron, danger, onPress,
+}: {
+  icon: IconName; label: string; value?: string;
+  control?: React.ReactNode; chevron?: boolean; danger?: boolean; onPress?: () => void;
+}) {
+  const Wrap: React.ElementType = onPress ? TouchableOpacity : View;
+  return (
+    <Wrap style={styles.row} onPress={onPress} activeOpacity={0.7}>
+      <View style={[styles.rowIcon, danger && styles.rowIconDanger]}>
+        <Ionicons name={icon} size={18} color={danger ? COLORS.error : COLORS.accent} />
+      </View>
+      <Text style={[styles.rowLabel, danger && styles.rowLabelDanger]}>{label}</Text>
+      {value ? <Text style={styles.rowValue}>{value}</Text> : null}
+      {control}
+      {chevron && <Ionicons name="chevron-forward" size={18} color={COLORS.textDim} />}
+    </Wrap>
+  );
 }
+
+const HR = () => <View style={styles.hr} />;
 
 export default function SettingsScreen() {
   const { logout, address } = useWallet();
 
-  const [biometric,   setBiometricState]  = useState(true);
-  const [autoSettle,  setAutoSettleState] = useState(true);
-  const [langCode,    setLangCode]        = useState<LanguageCode>('en');
-  const [langPicker,  setLangPicker]      = useState(false);
+  const [biometric, setBiometricState] = useState(true);
+  const [autoSettle, setAutoSettleState] = useState(true);
+  const [langCode, setLangCode] = useState<LanguageCode>('en');
+  const [langPicker, setLangPicker] = useState(false);
 
-  // Load persisted preferences on mount
   useEffect(() => {
     try {
       const prefs = getPreferences();
       setBiometricState(prefs.biometric_enabled);
       setAutoSettleState(prefs.auto_settle_enabled);
       setLangCode(prefs.language as LanguageCode);
-    } catch {
-      // DB not ready yet — defaults are fine
-    }
+    } catch { /* DB not ready */ }
   }, []);
 
   const short = address ? `${address.slice(0, 10)}…${address.slice(-8)}` : '—';
 
   async function handleBiometric(val: boolean) {
-    // Re-store the key under the new access control. Reading uses the CURRENT
-    // setting, so turning protection OFF requires passing biometric first.
     const ok = await setKeyAuthBinding(val);
     if (!ok) {
       Alert.alert(
@@ -57,7 +68,7 @@ export default function SettingsScreen() {
           ? 'This device has no biometric or screen lock enrolled. Set one up in your device settings first.'
           : 'Authentication was cancelled. Biometric unlock stays on.',
       );
-      return; // leave switch + preference unchanged
+      return;
     }
     setBiometricState(val);
     setBiometric(val);
@@ -75,8 +86,7 @@ export default function SettingsScreen() {
     setLangPicker(false);
   }
 
-  const currentLang = SUPPORTED_LANGUAGES.find(l => l.code === langCode)
-    ?? SUPPORTED_LANGUAGES[0];
+  const currentLang = SUPPORTED_LANGUAGES.find((l) => l.code === langCode) ?? SUPPORTED_LANGUAGES[0];
 
   function confirmLogout() {
     Alert.alert(
@@ -84,178 +94,80 @@ export default function SettingsScreen() {
       'This will remove your wallet from this device. Make sure you have your seed phrase or private key saved before continuing.',
       [
         { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Sign Out',
-          style: 'destructive',
-          onPress: async () => {
-            await logout();
-            router.replace('/onboarding');
-          },
-        },
+        { text: 'Sign Out', style: 'destructive', onPress: async () => { await logout(); router.replace('/onboarding'); } },
       ],
     );
   }
 
+  const toggle = (val: boolean, on: (v: boolean) => void) => (
+    <Switch value={val} onValueChange={on} trackColor={{ false: COLORS.border, true: COLORS.accent }} thumbColor={COLORS.text} />
+  );
+
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['top']}>
       <ScrollView contentContainerStyle={styles.content}>
         <Text style={styles.heading}>Settings</Text>
 
-        {/* Wallet */}
-        <Eyebrow>Wallet</Eyebrow>
-        <Card style={styles.card}>
-          <StatRow label="Address" value={short} mono />
-          <Divider />
-          <StatRow
-            label="Receive USDC"
-            accent chevron
-            onPress={() => router.push('/receive')}
-          />
-          <Divider />
-          <StatRow
-            label="Backup Seed Phrase"
-            accent chevron
-            onPress={() => router.push('/backup')}
-          />
-        </Card>
+        {/* account header */}
+        <View style={styles.accountHeader}>
+          <Avatar seed={address ?? 'You'} size={56} />
+          <View style={{ flex: 1 }}>
+            <Text style={styles.accountName}>Your wallet</Text>
+            <Text style={styles.accountAddr}>{short}</Text>
+          </View>
+          <Badge status="accent">Arc</Badge>
+        </View>
 
-        {/* Recovery */}
-        <Eyebrow>Recovery</Eyebrow>
-        <Card style={styles.card}>
-          <StatRow
-            label="Cloud Backup"
-            value="Encrypted · PIN protected"
-            accent chevron
-            onPress={() => router.push('/pin-setup')}
-          />
-          <Divider />
-          <StatRow
-            label="Guardian Recovery"
-            value="2-of-3 Shamir shards"
-            accent chevron
-            onPress={() => router.push('/guardian-setup')}
-          />
-        </Card>
+        <Eyebrow style={styles.eyebrow}>Security</Eyebrow>
+        <View style={styles.group}>
+          <Row icon="scan-outline" label="Biometric unlock" control={toggle(biometric, handleBiometric)} />
+          <HR />
+          <Row icon="key-outline" label="Recovery phrase" chevron onPress={() => router.push('/backup')} />
+          <HR />
+          <Row icon="people-outline" label="Guardian recovery" chevron onPress={() => router.push('/guardian-setup')} />
+        </View>
 
-        {/* Security */}
-        <Eyebrow>Security</Eyebrow>
-        <Card style={styles.card}>
-          <StatRow
-            label="Biometric unlock"
-            control={
-              <Switch
-                value={biometric}
-                onValueChange={handleBiometric}
-                trackColor={{ false: COLORS.border, true: COLORS.accent }}
-                thumbColor={COLORS.text}
-              />
-            }
-          />
-        </Card>
+        <Eyebrow style={styles.eyebrow}>Recovery</Eyebrow>
+        <View style={styles.group}>
+          <Row icon="cloud-upload-outline" label="Cloud backup" value="PIN protected" chevron onPress={() => router.push('/pin-setup')} />
+        </View>
 
-        {/* Language */}
-        <Eyebrow>Language</Eyebrow>
-        <Card style={styles.card}>
-          <TouchableOpacity
-            style={styles.langRow}
-            onPress={() => setLangPicker(true)}
-            activeOpacity={0.7}
-          >
-            <Text style={styles.langFlag}>{currentLang.flag}</Text>
-            <Text style={styles.langName}>{currentLang.name}</Text>
-            <Text style={styles.langChevron}>›</Text>
-          </TouchableOpacity>
-        </Card>
+        <Eyebrow style={styles.eyebrow}>Gasless USDC · Beta</Eyebrow>
+        <View style={styles.group}>
+          <Row icon="card-outline" label="Smart account" value="Gas in USDC" chevron onPress={() => router.push('/smart-account')} />
+          <HR />
+          <Row icon="sparkles-outline" label="Agent wallet" value="Mandate" chevron onPress={() => router.push('/agent')} />
+        </View>
 
-        {/* Smart account (beta) */}
-        <Eyebrow>Gasless USDC (Beta)</Eyebrow>
-        <Card style={styles.card}>
-          <StatRow
-            label="Smart Account"
-            value="Pay gas in USDC"
-            accent chevron
-            onPress={() => router.push('/smart-account')}
-          />
-          <Divider />
-          <StatRow
-            label="Agent Wallet"
-            value="Autonomous spending mandate"
-            accent chevron
-            onPress={() => router.push('/agent')}
-          />
-        </Card>
+        <Eyebrow style={styles.eyebrow}>Preferences</Eyebrow>
+        <View style={styles.group}>
+          <Row icon="flash-outline" label="Auto-settle when online" control={toggle(autoSettle, handleAutoSettle)} />
+          <HR />
+          <Row icon="language-outline" label="Language" value={`${currentLang.flag}  ${currentLang.name}`} chevron onPress={() => setLangPicker(true)} />
+        </View>
 
-        {/* Network */}
-        <Eyebrow>Network</Eyebrow>
-        <Card style={styles.card}>
-          <StatRow
-            label="Auto-settle when online"
-            control={
-              <Switch
-                value={autoSettle}
-                onValueChange={handleAutoSettle}
-                trackColor={{ false: COLORS.border, true: COLORS.accent }}
-                thumbColor={COLORS.text}
-              />
-            }
-          />
-          <Divider />
-          <StatRow label="Chain ID" value={String(ACTIVE_CHAIN.chainId)} mono />
-          <StatRow label="RPC"      value={ACTIVE_CHAIN.rpc.replace('https://', '')} mono />
-        </Card>
+        <Eyebrow style={styles.eyebrow}>Network</Eyebrow>
+        <View style={styles.group}>
+          <Row icon="globe-outline" label="Network" value="Arc Testnet" />
+          <HR />
+          <Row icon="git-network-outline" label="Chain ID" value={String(ACTIVE_CHAIN.chainId)} />
+          <HR />
+          <Row icon="water-outline" label="Get testnet USDC" chevron onPress={() => Linking.openURL('https://faucet.circle.com')} />
+        </View>
 
-        {/* USDC Networks */}
-        <Eyebrow>USDC Networks</Eyebrow>
-        <Card style={styles.card}>
-          {Object.values(CHAINS).map((chain, i, arr) => (
-            <View key={chain.id}>
-              <View style={styles.chainRow}>
-                <View style={styles.chainInfo}>
-                  <Text style={[styles.chainName, !chain.enabled && styles.chainNameDim]}>
-                    {chain.name}
-                  </Text>
-                  <Text style={styles.chainMeta}>
-                    {chain.usdc.type === 'native' ? 'Native USDC' : `ERC-20 · ${chain.usdc.decimals}dp`}
-                    {chain.testnet ? ' · Testnet' : ''}
-                  </Text>
-                </View>
-                <View style={[styles.chainBadge, chain.enabled ? styles.chainBadgeActive : styles.chainBadgeSoon]}>
-                  <Text style={[styles.chainBadgeText, chain.enabled ? styles.chainBadgeTextActive : styles.chainBadgeTextSoon]}>
-                    {chain.enabled ? 'Active' : 'Soon'}
-                  </Text>
-                </View>
-              </View>
-              {i < arr.length - 1 && <Divider />}
-            </View>
-          ))}
-        </Card>
+        <Eyebrow style={styles.eyebrow}>Wallet</Eyebrow>
+        <View style={styles.group}>
+          <Row icon="qr-code-outline" label="Receive USDC" chevron onPress={() => router.push('/receive')} />
+        </View>
 
-        {/* About */}
-        <Eyebrow>About</Eyebrow>
-        <Card style={styles.card}>
-          <StatRow label="Version"    value="1.0.0" />
-          <StatRow label="Built with" value="Expo · Arc · ethers.js" />
-        </Card>
-
-        {/* Sign out */}
-        <Eyebrow>Account</Eyebrow>
-        <Button
-          title="Sign Out"
-          variant="danger"
-          onPress={confirmLogout}
-        />
-        <Text style={styles.signOutHint}>
-          Removes wallet from this device. Restore it later with your seed phrase.
-        </Text>
+        <TouchableOpacity style={styles.signOut} onPress={confirmLogout} activeOpacity={0.85}>
+          <Text style={styles.signOutText}>Sign Out</Text>
+        </TouchableOpacity>
+        <Text style={styles.about}>Wayamesh · v1.0.0 · Built on Arc</Text>
       </ScrollView>
 
-      {/* Language picker modal */}
-      <Modal
-        visible={langPicker}
-        animationType="slide"
-        presentationStyle="pageSheet"
-        onRequestClose={() => setLangPicker(false)}
-      >
+      {/* language picker */}
+      <Modal visible={langPicker} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setLangPicker(false)}>
         <SafeAreaView style={styles.modalContainer}>
           <View style={styles.modalHeader}>
             <Text style={styles.modalTitle}>Language</Text>
@@ -265,24 +177,13 @@ export default function SettingsScreen() {
           </View>
           <FlatList
             data={SUPPORTED_LANGUAGES}
-            keyExtractor={item => item.code}
-            ItemSeparatorComponent={() => <View style={styles.divider} />}
+            keyExtractor={(item) => item.code}
+            ItemSeparatorComponent={() => <View style={styles.hr} />}
             renderItem={({ item }) => (
-              <TouchableOpacity
-                style={styles.langOption}
-                onPress={() => handleSelectLanguage(item.code as LanguageCode)}
-                activeOpacity={0.7}
-              >
+              <TouchableOpacity style={styles.langOption} onPress={() => handleSelectLanguage(item.code as LanguageCode)} activeOpacity={0.7}>
                 <Text style={styles.langOptionFlag}>{item.flag}</Text>
-                <Text style={[
-                  styles.langOptionName,
-                  item.code === langCode && styles.langOptionActive,
-                ]}>
-                  {item.name}
-                </Text>
-                {item.code === langCode && (
-                  <Text style={styles.langOptionCheck}>✓</Text>
-                )}
+                <Text style={[styles.langOptionName, item.code === langCode && styles.langOptionActive]}>{item.name}</Text>
+                {item.code === langCode && <Ionicons name="checkmark" size={18} color={COLORS.accent} />}
               </TouchableOpacity>
             )}
           />
@@ -294,45 +195,37 @@ export default function SettingsScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: COLORS.bg },
-  content:   { padding: SPACING.lg, paddingBottom: SPACING.xxl },
-  heading:   { fontSize: 28, fontWeight: '700', color: COLORS.text, marginBottom: SPACING.lg, letterSpacing: -0.3 },
-  eyebrow: {
-    fontSize: 11, fontWeight: '600', color: COLORS.textMuted,
-    textTransform: 'uppercase', letterSpacing: 1,
-    marginBottom: SPACING.sm, marginTop: SPACING.md,
-  },
-  card:    { gap: SPACING.sm, marginBottom: SPACING.xs },
-  divider: { height: 1, backgroundColor: COLORS.border, marginVertical: 4 },
-  signOutHint: {
-    fontSize: 12, color: COLORS.textDim,
-    textAlign: 'center', marginTop: SPACING.sm, lineHeight: 18,
+  content: { padding: SPACING.lg, paddingBottom: SPACING.xxl },
+  heading: { fontSize: 28, fontWeight: '700', color: COLORS.text, marginBottom: SPACING.lg, letterSpacing: -0.3 },
+
+  accountHeader: { flexDirection: 'row', alignItems: 'center', gap: 14, paddingVertical: SPACING.sm, marginBottom: SPACING.sm },
+  accountName: { fontSize: 17, fontWeight: '700', color: COLORS.text },
+  accountAddr: { fontSize: 12, color: COLORS.textDim, fontFamily: FONTS.mono, marginTop: 2 },
+
+  eyebrow: { marginTop: SPACING.md, marginBottom: SPACING.sm },
+  group: {
+    backgroundColor: COLORS.surface, borderWidth: 1, borderColor: COLORS.border,
+    borderRadius: RADIUS.lg, paddingHorizontal: SPACING.md,
   },
 
-  langRow: {
-    flexDirection: 'row', alignItems: 'center',
-    paddingVertical: SPACING.sm, gap: SPACING.sm,
+  row: { flexDirection: 'row', alignItems: 'center', gap: 14, paddingVertical: 14 },
+  rowIcon: {
+    width: 36, height: 36, borderRadius: 10, alignItems: 'center', justifyContent: 'center',
+    backgroundColor: COLORS.surfaceAlt, borderWidth: 1, borderColor: COLORS.border,
   },
-  langFlag:    { fontSize: 22 },
-  langName:    { flex: 1, fontSize: 15, fontWeight: '500', color: COLORS.text },
-  langChevron: { fontSize: 20, color: COLORS.textMuted },
+  rowIconDanger: { backgroundColor: COLORS.errorSoft, borderColor: 'rgba(255,77,106,0.3)' },
+  rowLabel: { flex: 1, fontSize: 15, color: COLORS.text, fontWeight: '500' },
+  rowLabelDanger: { color: COLORS.error },
+  rowValue: { fontSize: 13, color: COLORS.textMuted },
+  hr: { height: 1, backgroundColor: COLORS.border },
 
-  chainRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 2 },
-  chainInfo: { flex: 1, gap: 2 },
-  chainName: { fontSize: 14, fontWeight: '600', color: COLORS.text },
-  chainNameDim: { color: COLORS.textMuted },
-  chainMeta: { fontSize: 11, color: COLORS.textDim },
-
-  chainBadge: {
-    paddingHorizontal: 8, paddingVertical: 3,
-    borderRadius: 6, borderWidth: 1,
+  signOut: {
+    marginTop: SPACING.xl, paddingVertical: 15, borderRadius: RADIUS.md, alignItems: 'center',
+    backgroundColor: COLORS.errorSoft, borderWidth: 1, borderColor: 'rgba(255,77,106,0.3)',
   },
-  chainBadgeActive: { backgroundColor: COLORS.accentSoft, borderColor: COLORS.accent },
-  chainBadgeSoon:   { backgroundColor: 'transparent', borderColor: COLORS.border },
-  chainBadgeText:     { fontSize: 11, fontWeight: '600' },
-  chainBadgeTextActive: { color: COLORS.accent },
-  chainBadgeTextSoon:   { color: COLORS.textDim },
+  signOutText: { color: COLORS.error, fontWeight: '700', fontSize: 15 },
+  about: { fontSize: 12, color: COLORS.textDim, textAlign: 'center', marginTop: SPACING.md },
 
-  // Language modal
   modalContainer: { flex: 1, backgroundColor: COLORS.bg },
   modalHeader: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
@@ -341,13 +234,8 @@ const styles = StyleSheet.create({
   },
   modalTitle: { fontSize: 18, fontWeight: '700', color: COLORS.text },
   modalClose: { fontSize: 16, color: COLORS.accent, fontWeight: '600' },
-
-  langOption: {
-    flexDirection: 'row', alignItems: 'center', gap: SPACING.md,
-    paddingHorizontal: SPACING.lg, paddingVertical: 16,
-  },
+  langOption: { flexDirection: 'row', alignItems: 'center', gap: SPACING.md, paddingHorizontal: SPACING.lg, paddingVertical: 16 },
   langOptionFlag: { fontSize: 26 },
   langOptionName: { flex: 1, fontSize: 16, color: COLORS.text },
   langOptionActive: { color: COLORS.accent, fontWeight: '600' },
-  langOptionCheck: { fontSize: 18, color: COLORS.accent, fontWeight: '700' },
 });

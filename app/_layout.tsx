@@ -4,6 +4,9 @@ import { Stack, useRootNavigationState, router } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { I18nextProvider } from 'react-i18next';
+import { useFonts } from 'expo-font';
+import { InstrumentSerif_400Regular_Italic } from '@expo-google-fonts/instrument-serif';
+import { SpaceMono_400Regular, SpaceMono_700Bold } from '@expo-google-fonts/space-mono';
 import { initDatabase } from '@/db/schema';
 import { hasWallet } from '@/wallet/keystore';
 import { backupExists } from '@/wallet/backup';
@@ -24,6 +27,12 @@ export default function RootLayout() {
   const [walletExists, setWalletExists] = useState<boolean | null>(null);
   const navigationState = useRootNavigationState();
   const appState = useRef(AppState.currentState);
+
+  const [fontsLoaded] = useFonts({
+    InstrumentSerif_400Regular_Italic,
+    SpaceMono_400Regular,
+    SpaceMono_700Bold,
+  });
 
   // Bootstrap: init DB then check wallet
   useEffect(() => {
@@ -103,6 +112,9 @@ export default function RootLayout() {
     return () => { sub.remove(); clearInterval(timer); };
   }, []);
 
+  // Hold render until brand fonts are ready to avoid a font swap flash.
+  if (!fontsLoaded) return null;
+
   return (
     <I18nextProvider i18n={i18n}>
     <SafeAreaProvider>
@@ -112,7 +124,7 @@ export default function RootLayout() {
         <Stack.Screen name="(tabs)"     options={{ animation: 'none' }} />
         <Stack.Screen
           name="send"
-          options={{ presentation: 'modal', headerTitle: 'Send USDC', ...MODAL_HEADER }}
+          options={{ presentation: 'modal', headerShown: false }}
         />
         <Stack.Screen
           name="receive"
