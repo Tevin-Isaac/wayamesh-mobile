@@ -119,7 +119,7 @@ export default {
     encrypting: 'جارٍ التشفير…',
     backupFailed: 'فشل النسخ الاحتياطي — حاول مجدداً',
     noWallet: 'لم يتم العثور على المحفظة — يرجى المحاولة مجدداً',
-    securityNote: 'مشفَّر بـ AES-256 عبر scrypt · مُخزَّن في تخزينك السحابي',
+    securityNote: 'مشفَّر بـ scrypt + AES · مُخزَّن في تخزينك السحابي',
   },
   restore: {
     title: 'استعادة المحفظة',

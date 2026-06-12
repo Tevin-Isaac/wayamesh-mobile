@@ -119,7 +119,7 @@ export default {
     encrypting: '正在加密…',
     backupFailed: '备份失败 — 请重试',
     noWallet: '未找到钱包 — 请重试',
-    securityNote: '通过 scrypt 使用 AES-256 加密 · 备份至您的云存储',
+    securityNote: '使用 scrypt + AES 加密 · 备份至您的云存储',
   },
   restore: {
     title: '恢复钱包',

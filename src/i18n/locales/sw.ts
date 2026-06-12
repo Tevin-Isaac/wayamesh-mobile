@@ -119,7 +119,7 @@ export default {
     encrypting: 'Inasimba…',
     backupFailed: 'Hifadhi imeshindwa — jaribu tena',
     noWallet: 'Mkoba haupatikani — jaribu tena',
-    securityNote: 'Imesimbwa kwa AES-256 · imehifadhiwa kwenye wingu lako',
+    securityNote: 'Imesimbwa kwa scrypt + AES · imehifadhiwa kwenye wingu lako',
   },
   restore: {
     title: 'Rejesha Mkoba',

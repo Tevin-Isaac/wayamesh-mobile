@@ -119,7 +119,7 @@ export default {
     encrypting: 'Ana ɓoyewa…',
     backupFailed: 'Ajiyawa ta kasa — gwada sake',
     noWallet: 'Ba a sami walat ba — don Allah gwada sake',
-    securityNote: 'An ɓoye da AES-256 · an ajiye a gajimarenku',
+    securityNote: 'An ɓoye da scrypt + AES · an ajiye a gajimarenku',
   },
   restore: {
     title: 'Maido Walat',

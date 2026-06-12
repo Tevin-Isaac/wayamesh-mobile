@@ -119,7 +119,7 @@ export default {
     encrypting: 'Chiffrement…',
     backupFailed: 'Sauvegarde échouée — réessayez',
     noWallet: 'Portefeuille introuvable — veuillez réessayer',
-    securityNote: 'Chiffré avec AES-256 via scrypt · sauvegardé dans votre stockage cloud',
+    securityNote: 'Chiffré avec scrypt + AES · sauvegardé dans votre stockage cloud',
   },
   restore: {
     title: 'Restaurer le portefeuille',

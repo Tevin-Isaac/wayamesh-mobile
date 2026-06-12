@@ -119,7 +119,7 @@ export default {
     encrypting: '암호화 중…',
     backupFailed: '백업 실패 — 다시 시도하세요',
     noWallet: '지갑을 찾을 수 없습니다 — 다시 시도해 주세요',
-    securityNote: 'scrypt를 통한 AES-256 암호화 · 클라우드 저장소에 백업',
+    securityNote: 'scrypt + AES 암호화 · 클라우드 저장소에 백업',
   },
   restore: {
     title: '지갑 복원',

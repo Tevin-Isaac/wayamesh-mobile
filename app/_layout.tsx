@@ -127,6 +127,10 @@ export default function RootLayout() {
           name="guardian-setup"
           options={{ presentation: 'modal', headerTitle: 'Guardian Recovery', ...MODAL_HEADER }}
         />
+        <Stack.Screen
+          name="recover"
+          options={{ presentation: 'modal', headerTitle: 'Recover with Guardians', ...MODAL_HEADER }}
+        />
       </Stack>
     </SafeAreaProvider>
     </I18nextProvider>

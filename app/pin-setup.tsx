@@ -113,8 +113,9 @@ export default function PassphraseSetupScreen() {
           {error ? <Text style={styles.errorText}>{error}</Text> : null}
 
           <Text style={styles.securityNote}>
-            Encrypted with AES-256 via scrypt · stored only on your device's backup.
-            We never see your passphrase and cannot reset it.
+            Encrypted with the standard Web3 keystore (scrypt N=131072 + AES) ·
+            stored only on your device's backup. We never see your passphrase and
+            cannot reset it.
           </Text>
         </ScrollView>
 

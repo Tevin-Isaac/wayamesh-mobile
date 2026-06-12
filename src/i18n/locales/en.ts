@@ -129,7 +129,7 @@ export default {
     encrypting: 'Encrypting…',
     backupFailed: 'Backup failed — try again',
     noWallet: 'Wallet not found — please try again',
-    securityNote: 'Encrypted with AES-256 via scrypt · backed up to your cloud storage',
+    securityNote: 'Encrypted with scrypt + AES · backed up to your cloud storage',
   },
   // Restore
   restore: {

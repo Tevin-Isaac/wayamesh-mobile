@@ -119,7 +119,7 @@ export default {
     encrypting: 'Criptografando…',
     backupFailed: 'Backup falhou — tente novamente',
     noWallet: 'Carteira não encontrada — tente novamente',
-    securityNote: 'Criptografado com AES-256 via scrypt · backup no seu armazenamento em nuvem',
+    securityNote: 'Criptografado com scrypt + AES · backup no seu armazenamento em nuvem',
   },
   restore: {
     title: 'Restaurar Carteira',

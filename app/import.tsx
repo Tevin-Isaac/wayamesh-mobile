@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import {
   View, Text, StyleSheet,
-  Alert, KeyboardAvoidingView, Platform,
+  Alert, KeyboardAvoidingView, Platform, TouchableOpacity,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
@@ -79,6 +79,15 @@ export default function ImportScreen() {
               </Text>
             </View>
           </Card>
+
+          <TouchableOpacity
+            onPress={() => router.push('/recover')}
+            activeOpacity={0.7}
+            style={styles.recoverRow}
+          >
+            <Ionicons name="people-outline" size={16} color={COLORS.accent} />
+            <Text style={styles.recoverText}>Lost your key? Recover with guardian shards</Text>
+          </TouchableOpacity>
         </View>
 
         <View style={styles.footer}>
@@ -103,5 +112,7 @@ const styles = StyleSheet.create({
   warningCard: { padding: SPACING.md },
   warningRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 8 },
   warningText: { flex: 1, fontSize: 13, color: COLORS.error, lineHeight: 20 },
+  recoverRow:  { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: SPACING.sm },
+  recoverText: { fontSize: 13, color: COLORS.accent, textDecorationLine: 'underline' },
   footer: { padding: SPACING.lg, paddingTop: 0 },
 });

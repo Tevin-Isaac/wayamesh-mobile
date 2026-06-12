@@ -119,7 +119,7 @@ export default {
     encrypting: 'Cifrando…',
     backupFailed: 'Respaldo fallido — intenta de nuevo',
     noWallet: 'Billetera no encontrada — inténtalo de nuevo',
-    securityNote: 'Cifrado con AES-256 via scrypt · respaldado en tu almacenamiento en la nube',
+    securityNote: 'Cifrado con scrypt + AES · respaldado en tu almacenamiento en la nube',
   },
   restore: {
     title: 'Restaurar billetera',

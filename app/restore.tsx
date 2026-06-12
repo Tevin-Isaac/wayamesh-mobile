@@ -122,6 +122,9 @@ export default function RestoreScreen() {
             style={styles.submit}
           />
 
+          <TouchableOpacity onPress={() => router.push('/recover')} activeOpacity={0.7}>
+            <Text style={styles.altLink}>Forgot passphrase? Recover with guardian shards</Text>
+          </TouchableOpacity>
           <TouchableOpacity onPress={() => router.replace('/onboarding')} activeOpacity={0.7}>
             <Text style={styles.altLink}>Create a new wallet instead</Text>
           </TouchableOpacity>
