@@ -1,4 +1,4 @@
-import * as SecureStore from 'expo-secure-store';
+import { readPrivateKey } from './keystore';
 
 // shamirs-secret-sharing is CommonJS; typed inline to avoid declaration issues.
 // eslint-disable-next-line @typescript-eslint/no-require-imports
@@ -6,8 +6,6 @@ const sss = require('shamirs-secret-sharing') as {
   split(secret: Buffer, opts: { shares: number; threshold: number }): Buffer[];
   combine(shares: Buffer[]): Buffer;
 };
-
-const KEY_STORE_KEY = 'wayamesh_encrypted_pk';
 
 export interface GuardianShard {
   index:       number;
@@ -26,7 +24,7 @@ export async function splitPrivateKey(
   threshold = 2,
   total     = 3,
 ): Promise<GuardianShard[]> {
-  const pk = await SecureStore.getItemAsync(KEY_STORE_KEY);
+  const pk = await readPrivateKey('Authenticate to split your key into guardian shards');
   if (!pk) throw new Error('No wallet found');
 
   const keyBytes = Buffer.from(pk.replace(/^0x/, ''), 'hex');

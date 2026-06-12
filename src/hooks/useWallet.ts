@@ -65,7 +65,7 @@ export function useWallet() {
   }, []);
 
   const unlock = useCallback(async () => {
-    return loadWallet(true);
+    return loadWallet();
   }, []);
 
   return { ...state, refresh, create, importExisting, logout, unlock };

@@ -11,6 +11,7 @@ import { Button } from '@/components/ui/Button';
 import { COLORS, SPACING, RADIUS } from '@/constants/theme';
 import { CHAINS, ACTIVE_CHAIN } from '@/constants/chain';
 import { useWallet } from '@/hooks/useWallet';
+import { setKeyAuthBinding } from '@/wallet/keystore';
 import {
   getPreferences, setBiometric, setAutoSettle, setLanguage,
 } from '@/utils/preferences';
@@ -45,7 +46,19 @@ export default function SettingsScreen() {
 
   const short = address ? `${address.slice(0, 10)}…${address.slice(-8)}` : '—';
 
-  function handleBiometric(val: boolean) {
+  async function handleBiometric(val: boolean) {
+    // Re-store the key under the new access control. Reading uses the CURRENT
+    // setting, so turning protection OFF requires passing biometric first.
+    const ok = await setKeyAuthBinding(val);
+    if (!ok) {
+      Alert.alert(
+        val ? 'Could not enable' : 'Could not disable',
+        val
+          ? 'This device has no biometric or screen lock enrolled. Set one up in your device settings first.'
+          : 'Authentication was cancelled. Biometric unlock stays on.',
+      );
+      return; // leave switch + preference unchanged
+    }
     setBiometricState(val);
     setBiometric(val);
   }

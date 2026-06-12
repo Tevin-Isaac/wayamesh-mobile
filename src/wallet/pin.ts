@@ -1,8 +1,6 @@
-import * as SecureStore from 'expo-secure-store';
 import { ethers } from 'ethers';
 import { getDb } from '@/db/schema';
-
-const KEY_STORE_KEY = 'wayamesh_encrypted_pk';
+import { readPrivateKey } from './keystore';
 
 // [attempts_reached, lock_duration_seconds]
 const LOCKOUT_SCHEDULE: [number, number][] = [
@@ -83,11 +81,13 @@ export function resetPinAttempts(): void {
 }
 
 /**
- * Encrypt the wallet private key with a PIN using ethers.js scrypt keystore (EIP-55).
- * scrypt N=131072 means ~2s per guess — extremely strong KDF.
+ * Encrypt the wallet private key with a passphrase using ethers.js scrypt
+ * keystore (EIP-55). scrypt N=131072 makes each guess cost ~seconds; combined
+ * with an alphanumeric passphrase this resists offline brute force of a stolen
+ * backup file (the in-app lockout only guards on-device attempts).
  */
 export async function encryptWithPin(pin: string): Promise<string> {
-  const pk = await SecureStore.getItemAsync(KEY_STORE_KEY);
+  const pk = await readPrivateKey('Authenticate to encrypt your backup');
   if (!pk) throw new Error('No wallet key found');
   return new ethers.Wallet(pk).encrypt(pin);
 }
