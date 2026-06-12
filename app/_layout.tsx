@@ -154,6 +154,10 @@ export default function RootLayout() {
           name="smart-account"
           options={{ presentation: 'modal', headerTitle: 'Smart Account (Beta)', ...MODAL_HEADER }}
         />
+        <Stack.Screen
+          name="agent"
+          options={{ presentation: 'modal', headerTitle: 'Agent Wallet (Beta)', ...MODAL_HEADER }}
+        />
       </Stack>
     </SafeAreaProvider>
     </I18nextProvider>

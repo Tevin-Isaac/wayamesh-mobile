@@ -176,6 +176,13 @@ export default function SettingsScreen() {
             accent chevron
             onPress={() => router.push('/smart-account')}
           />
+          <Divider />
+          <StatRow
+            label="Agent Wallet"
+            value="Autonomous spending mandate"
+            accent chevron
+            onPress={() => router.push('/agent')}
+          />
         </Card>
 
         {/* Network */}
