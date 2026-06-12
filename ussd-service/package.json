@@ -1,0 +1,26 @@
+{
+  "name": "wayamesh-ussd-service",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Custodial USSD wallet for Wayamesh — feature-phone access to USDC on Base via an omnibus ledger.",
+  "type": "module",
+  "scripts": {
+    "dev": "node --import tsx --watch src/index.ts",
+    "start": "node --import tsx src/index.ts",
+    "typecheck": "tsc --noEmit",
+    "simulate": "node --import tsx src/simulate.ts"
+  },
+  "dependencies": {
+    "better-sqlite3": "^11.8.1",
+    "dotenv": "^16.4.7",
+    "ethers": "^6.13.5",
+    "express": "^4.21.2"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.12",
+    "@types/express": "^5.0.0",
+    "@types/node": "^22.10.5",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.3"
+  }
+}
