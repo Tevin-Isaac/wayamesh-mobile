@@ -28,7 +28,7 @@ export default function RootLayout() {
   const navigationState = useRootNavigationState();
   const appState = useRef(AppState.currentState);
 
-  const [fontsLoaded] = useFonts({
+  const [fontsLoaded, fontError] = useFonts({
     InstrumentSerif_400Regular_Italic,
     SpaceMono_400Regular,
     SpaceMono_700Bold,
@@ -112,8 +112,10 @@ export default function RootLayout() {
     return () => { sub.remove(); clearInterval(timer); };
   }, []);
 
-  // Hold render until brand fonts are ready to avoid a font swap flash.
-  if (!fontsLoaded) return null;
+  // Hold render until brand fonts are ready to avoid a font-swap flash — but
+  // fail open: if font loading errors, render anyway with system fonts rather
+  // than hanging on a blank screen.
+  if (!fontsLoaded && !fontError) return null;
 
   return (
     <I18nextProvider i18n={i18n}>
