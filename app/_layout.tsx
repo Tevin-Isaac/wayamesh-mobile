@@ -172,6 +172,10 @@ export default function RootLayout() {
           name="agent"
           options={{ presentation: 'modal', headerTitle: 'Agent Wallet (Beta)', ...MODAL_HEADER }}
         />
+        <Stack.Screen
+          name="chat-thread"
+          options={{ headerShown: false, animation: 'slide_from_right' }}
+        />
       </Stack>
     </SafeAreaProvider>
     </I18nextProvider>
