@@ -158,6 +158,8 @@ export default function SettingsScreen() {
         <Eyebrow style={styles.eyebrow}>Wallet</Eyebrow>
         <View style={styles.group}>
           <Row icon="qr-code-outline" label="Receive USDC" chevron onPress={() => router.push('/receive')} />
+          <HR />
+          <Row icon="card-outline" label="Add money · Cash out" chevron onPress={() => router.push('/ramp')} />
         </View>
 
         <TouchableOpacity style={styles.signOut} onPress={confirmLogout} activeOpacity={0.85}>

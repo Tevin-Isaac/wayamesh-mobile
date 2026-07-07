@@ -185,6 +185,10 @@ export default function RootLayout() {
           name="chat-thread"
           options={{ headerShown: false, animation: 'slide_from_right' }}
         />
+        <Stack.Screen
+          name="ramp"
+          options={{ presentation: 'modal', headerTitle: 'Add money', ...MODAL_HEADER }}
+        />
       </Stack>
     </SafeAreaProvider>
     </I18nextProvider>

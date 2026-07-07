@@ -110,6 +110,18 @@ export default function WalletScreen() {
           <QuickAction icon="scan-outline" label="Scan" onPress={() => router.push('/scan')} />
         </View>
 
+        {/* add money / cash out */}
+        <TouchableOpacity activeOpacity={0.8} onPress={() => router.push('/ramp')}>
+          <View style={[styles.card, styles.meshCard]}>
+            <View style={styles.meshIcon}><Ionicons name="card-outline" size={20} color={COLORS.accent} /></View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.meshTitle}>Add money · Cash out</Text>
+              <Text style={styles.meshSub}>Top up with USDC or withdraw to your bank</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={20} color={COLORS.textDim} />
+          </View>
+        </TouchableOpacity>
+
         {/* mesh card */}
         <TouchableOpacity activeOpacity={0.8} onPress={() => router.push('/(tabs)/mesh')}>
           <View style={[styles.card, styles.meshCard]}>
