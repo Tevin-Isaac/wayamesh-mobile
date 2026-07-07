@@ -64,6 +64,14 @@ export function addMessage(m: {
   );
 }
 
+/** True if a payment bubble for this tx hash already exists (sync dedup). */
+export function hasPaymentMessage(txHash: string): boolean {
+  ensureTables();
+  return !!getDb().getFirstSync<{ id: number }>(
+    'SELECT id FROM chat_messages WHERE tx_hash = ? LIMIT 1', [txHash],
+  );
+}
+
 export function getMessages(peer: string): ChatMessage[] {
   ensureTables();
   return getDb().getAllSync<ChatMessage>(

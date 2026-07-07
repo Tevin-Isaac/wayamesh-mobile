@@ -11,6 +11,8 @@ import { initDatabase } from '@/db/schema';
 import { hasWallet } from '@/wallet/keystore';
 import { backupExists } from '@/wallet/backup';
 import { settlePendingTransactions } from '@/wallet/transactions';
+import { syncIncoming } from '@/wallet/sync';
+import { getWallet } from '@/db/queries';
 import { getPreferences } from '@/utils/preferences';
 import i18n from '@/i18n';
 import { COLORS } from '@/constants/theme';
@@ -93,6 +95,13 @@ export default function RootLayout() {
         await settlePendingTransactions();
       } catch {
         // offline / RPC down — the next tick retries
+      }
+      // Detect USDC received by this wallet (log-scan + balance-delta).
+      try {
+        const addr = getWallet()?.address;
+        if (addr) await syncIncoming(addr);
+      } catch {
+        // offline — next tick retries
       }
     }
 

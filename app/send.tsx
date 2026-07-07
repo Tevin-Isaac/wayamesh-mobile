@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import {
-  View, Text, StyleSheet, TouchableOpacity, TextInput, ActivityIndicator, Animated, Easing,
+  View, Text, StyleSheet, TouchableOpacity, TextInput, ActivityIndicator, Animated, Easing, ScrollView,
 } from 'react-native';
 import { useRef } from 'react';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -10,6 +10,7 @@ import { ethers } from 'ethers';
 import { useWallet } from '@/hooks/useWallet';
 import { buildOfflineTransfer } from '@/wallet/transactions';
 import { Avatar } from '@/components/pro';
+import { getContacts, getContact, type Contact } from '@/db/chat';
 import { COLORS, SPACING, RADIUS, FONTS } from '@/constants/theme';
 
 type Phase = 'entry' | 'signing' | 'relaying' | 'done';
@@ -39,8 +40,10 @@ export default function SendScreen() {
   const [amt, setAmt] = useState('');
   const [phase, setPhase] = useState<Phase>('entry');
   const [error, setError] = useState('');
+  const [contacts, setContacts] = useState<Contact[]>([]);
 
   useEffect(() => { if (scannedAddress) setTo(scannedAddress); }, [scannedAddress]);
+  useEffect(() => { try { setContacts(getContacts()); } catch { /* db not ready */ } }, []);
 
   const validTo = ethers.isAddress(to);
   const bal = balance ? Number(balance) : 0;
@@ -91,28 +94,42 @@ export default function SendScreen() {
       {/* recipient */}
       {validTo ? (
         <View style={styles.toCard}>
-          <Avatar seed={to} size={40} />
+          <Avatar seed={getContact(to)?.name ?? to} size={40} />
           <View style={{ flex: 1 }}>
             <Text style={styles.toLabel}>TO</Text>
-            <Text style={styles.toValue}>{`${to.slice(0, 10)}…${to.slice(-8)}`}</Text>
+            <Text style={styles.toValue}>
+              {getContact(to)?.name ?? `${to.slice(0, 10)}…${to.slice(-8)}`}
+            </Text>
           </View>
           <TouchableOpacity onPress={() => setTo('')} activeOpacity={0.7}><Ionicons name="close-circle" size={20} color={COLORS.textDim} /></TouchableOpacity>
         </View>
       ) : (
-        <View style={styles.toInputCard}>
-          <TextInput
-            style={styles.toInput}
-            value={to}
-            onChangeText={setTo}
-            placeholder="Recipient address (0x…)"
-            placeholderTextColor={COLORS.textDim}
-            autoCapitalize="none"
-            autoCorrect={false}
-          />
-          <TouchableOpacity onPress={() => router.push('/scan')} activeOpacity={0.7} style={styles.scanBtn}>
-            <Ionicons name="qr-code-outline" size={22} color={COLORS.accent} />
-          </TouchableOpacity>
-        </View>
+        <>
+          <View style={styles.toInputCard}>
+            <TextInput
+              style={styles.toInput}
+              value={to}
+              onChangeText={setTo}
+              placeholder="Recipient address (0x…)"
+              placeholderTextColor={COLORS.textDim}
+              autoCapitalize="none"
+              autoCorrect={false}
+            />
+            <TouchableOpacity onPress={() => router.push('/scan')} activeOpacity={0.7} style={styles.scanBtn}>
+              <Ionicons name="qr-code-outline" size={22} color={COLORS.accent} />
+            </TouchableOpacity>
+          </View>
+          {contacts.length > 0 && (
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chips} contentContainerStyle={styles.chipsInner}>
+              {contacts.map((c) => (
+                <TouchableOpacity key={c.address} style={styles.chip} activeOpacity={0.7} onPress={() => setTo(c.address)}>
+                  <Avatar seed={c.name} size={30} />
+                  <Text style={styles.chipName} numberOfLines={1}>{c.name}</Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          )}
+        </>
       )}
 
       {/* amount */}
@@ -220,6 +237,15 @@ const styles = StyleSheet.create({
   },
   toInput: { flex: 1, paddingVertical: 14, color: COLORS.text, fontSize: 15, fontFamily: FONTS.mono },
   scanBtn: { paddingLeft: SPACING.sm, paddingVertical: 8 },
+
+  chips: { marginTop: SPACING.sm, maxHeight: 44, flexGrow: 0 },
+  chipsInner: { gap: SPACING.sm, paddingRight: SPACING.md },
+  chip: {
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+    paddingLeft: 6, paddingRight: 14, paddingVertical: 6,
+    borderRadius: RADIUS.full, borderWidth: 1, borderColor: COLORS.border, backgroundColor: COLORS.surface,
+  },
+  chipName: { fontSize: 13, color: COLORS.text, fontWeight: '500', maxWidth: 110 },
 
   amountArea: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   amountRow: { flexDirection: 'row', alignItems: 'baseline' },

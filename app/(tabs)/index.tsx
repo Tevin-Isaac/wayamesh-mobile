@@ -9,18 +9,27 @@ import { copyWithAutoClear } from '@/utils/clipboard';
 import { COLORS, SPACING, RADIUS, FONTS } from '@/constants/theme';
 import type { TransactionRow } from '@/db/queries';
 
-function ActivityRow({ tx }: { tx: TransactionRow }) {
-  const short = `${tx.to_address.slice(0, 6)}…${tx.to_address.slice(-4)}`;
+function shortAddr(a: string): string {
+  if (a === 'native transfer') return 'Network transfer';
+  if (a.length < 12) return a;
+  return `${a.slice(0, 6)}…${a.slice(-4)}`;
+}
+
+function ActivityRow({ tx, myAddress }: { tx: TransactionRow; myAddress: string | null }) {
+  const incoming = !!myAddress && tx.to_address.toLowerCase() === myAddress.toLowerCase();
+  const who = incoming ? tx.from_address : tx.to_address;
   const date = new Date(tx.created_at * 1000).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
   return (
     <View style={styles.activityRow}>
-      <Avatar seed={tx.to_address} size={42} dir="out" />
+      <Avatar seed={who} size={42} dir={incoming ? 'in' : 'out'} />
       <View style={styles.activityBody}>
-        <Text style={styles.activityWho} numberOfLines={1}>{short}</Text>
+        <Text style={styles.activityWho} numberOfLines={1}>{shortAddr(who)}</Text>
         <Text style={styles.activityDate}>{date}</Text>
       </View>
       <View style={styles.activityRight}>
-        <Text style={styles.activityAmt}>−{tx.amount}</Text>
+        <Text style={[styles.activityAmt, incoming && styles.activityAmtIn]}>
+          {incoming ? '+' : '−'}{tx.amount}
+        </Text>
         <View style={{ marginTop: 3 }}><StatusDot status={tx.status} /></View>
       </View>
     </View>
@@ -134,7 +143,7 @@ export default function WalletScreen() {
           )}
         </View>
         {recent.length > 0 ? (
-          recent.map((tx) => <ActivityRow key={tx.hash} tx={tx} />)
+          recent.map((tx) => <ActivityRow key={tx.hash} tx={tx} myAddress={address} />)
         ) : (
           <Text style={styles.empty}>No transactions yet — send USDC offline and it'll appear here.</Text>
         )}
@@ -205,6 +214,7 @@ const styles = StyleSheet.create({
   activityDate: { fontSize: 12, color: COLORS.textDim },
   activityRight: { alignItems: 'flex-end' },
   activityAmt: { fontFamily: FONTS.mono, fontSize: 15, fontWeight: '700', color: COLORS.text },
+  activityAmtIn: { color: COLORS.success },
 
   empty: { fontSize: 13, color: COLORS.textDim, lineHeight: 20, paddingVertical: SPACING.md },
 });
