@@ -1,0 +1,331 @@
+<title>Wayamesh — Pitch Deck</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<style>
+  /* ── Wayamesh tokens (brand is dark-native by design — single committed theme) ── */
+  :root {
+    color-scheme: dark;
+    --bg: #07070F; --surface: #0F0F1A; --raised: #16162A; --border: #1E1E35;
+    --mint: #3ED9B8; --mint-soft: rgba(62,217,184,.10); --mint-dim: rgba(62,217,184,.15);
+    --text: #F5F4F2; --muted: #8888A0; --dim: #555570;
+    --amber: #F5A623; --violet: #A78BFA; --coral: #FF4D6A;
+    --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    --mono: ui-monospace, "SF Mono", "Cascadia Mono", Menlo, Consolas, monospace;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html { scroll-snap-type: y mandatory; }
+  body { background: var(--bg); color: var(--text); font-family: var(--sans); }
+
+  .slide {
+    min-height: 100dvh; scroll-snap-align: start; position: relative;
+    display: flex; align-items: center; justify-content: center;
+    padding: clamp(24px, 5vw, 72px); overflow: hidden;
+  }
+  .inner { width: min(1080px, 100%); position: relative; z-index: 2; }
+  .slide + .slide { border-top: 1px solid var(--border); }
+
+  .num {
+    position: absolute; top: 22px; right: 26px; z-index: 3;
+    font: 12px var(--mono); color: var(--dim); letter-spacing: 1px;
+  }
+  .eyebrow {
+    font-size: 12px; font-weight: 600; letter-spacing: 1.6px; text-transform: uppercase;
+    color: var(--mint); margin-bottom: 18px;
+  }
+  h1 { font-size: clamp(34px, 6.2vw, 64px); font-weight: 800; letter-spacing: -1.2px; line-height: 1.06; text-wrap: balance; }
+  h2 { font-size: clamp(26px, 4.2vw, 44px); font-weight: 800; letter-spacing: -0.8px; line-height: 1.1; margin-bottom: 26px; text-wrap: balance; }
+  .lead { font-size: clamp(15px, 1.8vw, 19px); color: var(--muted); line-height: 1.65; max-width: 62ch; }
+  .lead b, .lead strong { color: var(--text); font-weight: 600; }
+  .mono { font-family: var(--mono); }
+  .mint { color: var(--mint); }
+  .dot-sep { color: var(--dim); padding: 0 6px; }
+
+  .card {
+    background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 22px;
+  }
+  .card.glow { border-color: var(--mint); box-shadow: 0 0 24px rgba(62,217,184,.14); }
+  .grid { display: grid; gap: 14px; }
+  .g2 { grid-template-columns: repeat(2, 1fr); } .g3 { grid-template-columns: repeat(3, 1fr); }
+  @media (max-width: 760px) { .g2, .g3 { grid-template-columns: 1fr; } }
+
+  .stat { font: 700 clamp(26px, 3.6vw, 40px)/1.1 var(--mono); letter-spacing: -1px; font-variant-numeric: tabular-nums; }
+  .stat small { display: block; font: 12px var(--sans); color: var(--muted); letter-spacing: .4px; margin-top: 8px; }
+  .k { font-size: 11px; font-weight: 600; letter-spacing: 1.2px; text-transform: uppercase; color: var(--dim); margin-bottom: 10px; }
+  .card h3 { font-size: 16px; font-weight: 700; margin-bottom: 8px; }
+  .card p { font-size: 13.5px; color: var(--muted); line-height: 1.6; }
+  .card p b { color: var(--text); font-weight: 600; }
+
+  ul.clean { list-style: none; } ul.clean li { position: relative; padding-left: 22px; margin: 10px 0; color: var(--muted); font-size: 14.5px; line-height: 1.6; }
+  ul.clean li::before { content: ""; position: absolute; left: 2px; top: .62em; width: 7px; height: 7px; border-radius: 50%; background: var(--mint); }
+  ul.clean li b { color: var(--text); font-weight: 600; }
+
+  .pill {
+    display: inline-flex; align-items: center; gap: 8px; padding: 7px 14px; border-radius: 999px;
+    border: 1px solid var(--border); background: var(--surface); font-size: 12.5px; color: var(--muted);
+  }
+  .pill .dotp { width: 7px; height: 7px; border-radius: 50%; background: var(--mint); }
+  .tag { font: 600 11px var(--sans); letter-spacing: 1px; text-transform: uppercase; padding: 4px 10px; border-radius: 6px; border: 1px solid; }
+  .tag.live { color: var(--mint); border-color: rgba(62,217,184,.35); background: var(--mint-soft); }
+  .tag.soon { color: var(--amber); border-color: rgba(245,166,35,.35); background: rgba(245,166,35,.1); }
+
+  /* flow arrows */
+  .flow { display: flex; flex-wrap: wrap; gap: 10px; align-items: stretch; }
+  .flow .card { flex: 1 1 150px; }
+  .arrow { align-self: center; color: var(--mint); font: 700 20px var(--mono); }
+
+  /* progress rail */
+  .rail { position: fixed; right: 14px; top: 50%; transform: translateY(-50%); z-index: 9; display: flex; flex-direction: column; gap: 8px; }
+  .rail a { width: 7px; height: 7px; border-radius: 50%; background: var(--border); display: block; transition: background .2s, transform .2s; }
+  .rail a.on { background: var(--mint); transform: scale(1.35); }
+  @media (max-width: 760px) { .rail { display: none; } }
+
+  .hint { position: fixed; bottom: 16px; left: 50%; transform: translateX(-50%); z-index: 9;
+    font: 11px var(--mono); color: var(--dim); letter-spacing: 1px; }
+
+  /* title slide */
+  .wordmark { font-weight: 800; letter-spacing: 7px; color: var(--mint); font-size: clamp(13px, 1.6vw, 17px); }
+  .title-hero { text-align: center; }
+  .title-glow { position: absolute; inset: 0; z-index: 1; pointer-events: none;
+    background: radial-gradient(720px 420px at 50% 38%, rgba(62,217,184,.09), transparent 70%); }
+  .logoW { width: clamp(150px, 22vw, 230px); height: auto; display: block; margin: 0 auto 6px;
+    filter: drop-shadow(0 0 22px rgba(62,217,184,.35)); }
+  @media (prefers-reduced-motion: no-preference) {
+    .nodeAnim { animation: pulse 3.2s ease-in-out infinite; transform-origin: center; }
+    .nodeAnim.d2 { animation-delay: 1.1s; } .nodeAnim.d3 { animation-delay: 2.1s; }
+    @keyframes pulse { 0%,100% { opacity: .55 } 50% { opacity: 1 } }
+  }
+
+  table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+  th { text-align: left; font-size: 11px; letter-spacing: 1.2px; text-transform: uppercase; color: var(--dim); padding: 10px 12px; border-bottom: 1px solid var(--border); }
+  td { padding: 11px 12px; border-bottom: 1px solid var(--border); color: var(--muted); vertical-align: top; }
+  td:first-child { color: var(--text); font-weight: 600; white-space: nowrap; }
+  .tableWrap { overflow-x: auto; border: 1px solid var(--border); border-radius: 14px; background: var(--surface); }
+
+  @media print {
+    html { scroll-snap-type: none; }
+    .slide { min-height: 0; page-break-after: always; padding: 40px; }
+    .rail, .hint { display: none; }
+  }
+</style>
+
+<nav class="rail" id="rail" aria-label="Slides"></nav>
+<div class="hint">SCROLL · ↑ ↓ · PRINT → PDF</div>
+
+<!-- 1 · TITLE -->
+<section class="slide" id="s1">
+  <div class="title-glow"></div>
+  <span class="num">01 / 11</span>
+  <div class="inner title-hero">
+    <svg class="logoW" viewBox="30 55 140 70" aria-label="Wayamesh logo">
+      <g fill="#3ED9B8" stroke="#3ED9B8" stroke-width="2.6" stroke-linecap="round">
+        <line x1="50" y1="80" x2="80" y2="100"/><line x1="80" y1="100" x2="100" y2="80"/>
+        <line x1="100" y1="80" x2="120" y2="100"/><line x1="120" y1="100" x2="150" y2="80"/>
+        <circle class="nodeAnim" cx="50" cy="80" r="6"/><circle class="nodeAnim d2" cx="80" cy="100" r="6"/>
+        <circle class="nodeAnim d3" cx="100" cy="80" r="6"/><circle class="nodeAnim" cx="120" cy="100" r="6"/>
+        <circle class="nodeAnim d2" cx="150" cy="80" r="6"/>
+      </g>
+    </svg>
+    <div class="wordmark">WAYAMESH</div>
+    <h1 style="margin:26px 0 18px">Send US dollars.<br><span class="mint">No internet required.</span></h1>
+    <p class="lead" style="margin:0 auto 28px">An offline-first USDC wallet with chat, built on Arc — for the billions who have money to move and networks that fail them.</p>
+    <span class="pill"><span class="dotp"></span>Build on Arc<span class="dot-sep">·</span>DeFi / Payments track<span class="dot-sep">·</span>Live on Arc Testnet</span>
+  </div>
+</section>
+
+<!-- 2 · PROBLEM -->
+<section class="slide" id="s2">
+  <span class="num">02 / 11</span>
+  <div class="inner">
+    <div class="eyebrow">Problem</div>
+    <h2>Money stops where the signal does.</h2>
+    <div class="grid g3" style="margin-bottom:18px">
+      <div class="card"><div class="stat">1.4B<small>adults unbanked — most hold a phone, not a bank account</small></div></div>
+      <div class="card"><div class="stat">~6%<small>average cost to send a remittance — the world's most expensive money</small></div></div>
+      <div class="card"><div class="stat">100s of millions<small>on intermittent networks: rural markets, transit, blackouts, border towns</small></div></div>
+    </div>
+    <p class="lead">Digital dollars exist — but every wallet assumes a live connection at the moment of payment. In the places that need dollars most, that assumption breaks daily. And local currencies can lose double-digit value in a year while people wait.</p>
+  </div>
+</section>
+
+<!-- 3 · SOLUTION -->
+<section class="slide" id="s3">
+  <span class="num">03 / 11</span>
+  <div class="inner">
+    <div class="eyebrow">Solution</div>
+    <h2>A dollar wallet that works like a messenger — and doesn't need the network to say yes.</h2>
+    <div class="flow" style="margin-bottom:20px">
+      <div class="card"><h3>Sign offline</h3><p>Payments are signed on-device with the user's own key. No connection needed at the moment of payment.</p></div>
+      <div class="arrow">→</div>
+      <div class="card"><h3>Queue &amp; relay</h3><p>Signed transactions queue locally; the mesh relay carries them hop-by-hop toward connectivity.</p></div>
+      <div class="arrow">→</div>
+      <div class="card glow"><h3>Settle on Arc</h3><p>The moment any path reconnects, funds settle final in <b>~480&nbsp;ms</b> — fees priced in dollars, paid in USDC.</p></div>
+    </div>
+    <ul class="clean">
+      <li><b>Chat and money in one thread</b> — send USDC inside a conversation, like a message.</li>
+      <li><b>Self-custody</b> — keys never leave the device. We can't touch user funds.</li>
+      <li><b>Feature phones included</b> — a companion USSD service brings USDC to phones with no apps at all.</li>
+    </ul>
+  </div>
+</section>
+
+<!-- 4 · PRODUCT -->
+<section class="slide" id="s4">
+  <span class="num">04 / 11</span>
+  <div class="inner">
+    <div class="eyebrow">Product · shipped</div>
+    <h2>Not a mockup. A working wallet on Arc Testnet.</h2>
+    <div class="grid g3">
+      <div class="card"><h3>Wallet core</h3><p>24-word HD wallet <span class="dot-sep">·</span> offline signing <span class="dot-sep">·</span> auto-settlement <span class="dot-sep">·</span> <b>incoming USDC detected automatically</b></p></div>
+      <div class="card"><h3>Money messenger</h3><p>Contacts, threads, and in-chat USDC payments — received payments drop into the sender's thread.</p></div>
+      <div class="card"><h3>Recovery that forgives</h3><p>Passphrase-encrypted backup <span class="dot-sep">·</span> <b>2-of-3 Shamir guardian recovery</b> <span class="dot-sep">·</span> hardware-bound biometrics.</p></div>
+      <div class="card"><h3>Gas paid in USDC</h3><p>Smart accounts + Circle Paymaster integrated — users never need a volatile gas token.</p></div>
+      <div class="card"><h3>Agent wallet</h3><p>Spending-mandate engine for autonomous payments: per-tx, daily, total caps <span class="dot-sep">·</span> allowlists <span class="dot-sep">·</span> audit log.</p></div>
+      <div class="card"><h3>On/off-ramp built in</h3><p>Provider-hosted buy/sell flows (Onramper / Transak pattern) — activates at mainnet with an API key.</p></div>
+    </div>
+    <p class="lead" style="margin-top:18px">Plus: 9 languages <span class="dot-sep">·</span> a standalone USSD service for feature phones <span class="dot-sep">·</span> Pro design system <span class="dot-sep">·</span> landing page live.</p>
+  </div>
+</section>
+
+<!-- 5 · WHY ARC -->
+<section class="slide" id="s5">
+  <span class="num">05 / 11</span>
+  <div class="inner">
+    <div class="eyebrow">Why Arc</div>
+    <h2>Arc is the only chain where our users never meet crypto's sharp edges.</h2>
+    <div class="grid g2" style="margin-bottom:18px">
+      <div class="card glow"><div class="stat mint">USDC = gas<small>fees are denominated in dollars — predictable for people who think in dollars</small></div></div>
+      <div class="card"><div class="stat">~480 ms<small>finality — settlement feels instant the moment a queued payment reconnects</small></div></div>
+      <div class="card"><div class="stat mono">5042002<small>Arc Testnet chain ID — every transaction in this deck runs here today</small></div></div>
+      <div class="card"><div class="stat">1,107<small>USDC transfers our sync engine read from a single 300-block window of live Arc</small></div></div>
+    </div>
+    <p class="lead">We integrated against the real network, not the docs: we verified Arc's USDC facade on-chain (<span class="mono">decimals = 6</span>, mirrors native balance), confirmed which transfers emit logs and which don't, and built a two-detector sync engine around what the chain actually does.</p>
+  </div>
+</section>
+
+<!-- 6 · HOW IT WORKS -->
+<section class="slide" id="s6">
+  <span class="num">06 / 11</span>
+  <div class="inner">
+    <div class="eyebrow">Architecture</div>
+    <h2>Self-custody end to end. No backend to trust — or to breach.</h2>
+    <div class="tableWrap">
+      <table>
+        <tr><th>Layer</th><th>What we built</th><th>Status</th></tr>
+        <tr><td>Keys</td><td>Device keystore, hardware-bound biometric reads, key readable in exactly one code path</td><td><span class="tag live">Live</span></td></tr>
+        <tr><td>Signing</td><td>Offline EIP-1559 signing, signer-recovery anti-tamper check, Arc chain ID bound</td><td><span class="tag live">Live</span></td></tr>
+        <tr><td>Settlement</td><td>Local queue → auto-settle on reconnect (foreground + 30 s tick)</td><td><span class="tag live">Live</span></td></tr>
+        <tr><td>Incoming</td><td>Dual detector: Transfer-log scan + balance-delta for logless native sends</td><td><span class="tag live">Live</span></td></tr>
+        <tr><td>Gasless UX</td><td>ERC-4337 smart account + Circle Paymaster — same address on Base &amp; Arc</td><td><span class="tag live">Built</span></td></tr>
+        <tr><td>Mesh relay</td><td>BLE transport — sender half built; peripheral receiver is the next transport milestone</td><td><span class="tag soon">Roadmap</span></td></tr>
+      </table>
+    </div>
+    <p class="lead" style="margin-top:16px">Security posture: scrypt <span class="mono">N=131072</span> backup encryption <span class="dot-sep">·</span> Shamir 2-of-3 <span class="dot-sep">·</span> zero data collection <span class="dot-sep">·</span> no fetch call in the app can carry a secret.</p>
+  </div>
+</section>
+
+<!-- 7 · MARKET -->
+<section class="slide" id="s7">
+  <span class="num">07 / 11</span>
+  <div class="inner">
+    <div class="eyebrow">Market</div>
+    <h2>Start where mobile money already won — and dollars are already the ask.</h2>
+    <div class="grid g3" style="margin-bottom:18px">
+      <div class="card"><div class="stat">$50B+<small>annual remittances into Sub-Saharan Africa alone</small></div></div>
+      <div class="card"><div class="stat">60M+<small>M-Pesa users prove phone-number money works at national scale</small></div></div>
+      <div class="card"><div class="stat">2 rails<small>smartphone app (self-custody) + USSD (feature phones) from day one</small></div></div>
+    </div>
+    <p class="lead"><b>Wedge:</b> corridors where connectivity is unreliable and local currency is depreciating — market traders, cross-border families, transit workers. Stablecoins are already the fastest-growing way dollars reach these users; nobody serves the offline moment.</p>
+  </div>
+</section>
+
+<!-- 8 · BUSINESS MODEL -->
+<section class="slide" id="s8">
+  <span class="num">08 / 11</span>
+  <div class="inner">
+    <div class="eyebrow">Business model</div>
+    <h2>Free to hold and send. We monetize the edges.</h2>
+    <div class="grid g3">
+      <div class="card"><h3>Ramp margin</h3><p>Referral share on provider on/off-ramp volume — the standard self-custody wallet model, zero licensing burden on us.</p></div>
+      <div class="card"><h3>USSD fees</h3><p>Mobile-money-style transaction fees on the custodial feature-phone rail, priced under incumbent transfer costs.</p></div>
+      <div class="card"><h3>Agent &amp; API</h3><p>Autonomous-payment mandates and merchant tooling on Arc — machine-to-machine USDC as the long-term curve.</p></div>
+    </div>
+    <p class="lead" style="margin-top:18px">P2P stays free — that's what makes the network grow. The unit economics live where money enters and exits.</p>
+  </div>
+</section>
+
+<!-- 9 · TRACTION -->
+<section class="slide" id="s9">
+  <span class="num">09 / 11</span>
+  <div class="inner">
+    <div class="eyebrow">Traction · engineering proof</div>
+    <h2>Four weeks of hackathon left — and the MVP already runs.</h2>
+    <div class="grid g2" style="margin-bottom:18px">
+      <div class="card glow"><div class="stat">30+<small>end-to-end checks passing: wallet, signing, backup, Shamir, live Arc RPC, smart account</small></div></div>
+      <div class="card"><div class="stat">2 apps<small>mobile wallet on Arc Testnet + working USSD service (simulated end-to-end)</small></div></div>
+      <div class="card"><div class="stat">9<small>languages shipped — built for the corridors, not just the demo</small></div></div>
+      <div class="card"><div class="stat">1 click<small>from a worldwide Android beta — EAS build profile configured, landing page live</small></div></div>
+    </div>
+    <p class="lead">Everything in this deck is in a public-ready repo with verified commits — judges can run the same test battery we do.</p>
+  </div>
+</section>
+
+<!-- 10 · ROADMAP -->
+<section class="slide" id="s10">
+  <span class="num">10 / 11</span>
+  <div class="inner">
+    <div class="eyebrow">Roadmap</div>
+    <h2>From testnet demo to corridor launch.</h2>
+    <div class="tableWrap">
+      <table>
+        <tr><th>Phase</th><th>Milestone</th><th>Unlocks</th></tr>
+        <tr><td>Now → Demo Day</td><td>Device-verified sponsored sends <span class="dot-sep">·</span> beta APK <span class="dot-sep">·</span> agent decision loop</td><td>Judged MVP on Arc</td></tr>
+        <tr><td>Post-hackathon</td><td>Base mainnet flip (config-gated, code ready) <span class="dot-sep">·</span> ramp provider live</td><td>Real money, first corridor pilot</td></tr>
+        <tr><td>Accelerator</td><td>BLE peripheral transport → true phone-to-phone relay <span class="dot-sep">·</span> USSD licensing partner</td><td>The offline promise, delivered</td></tr>
+        <tr><td>Arc mainnet</td><td>Migrate settlement home to Arc — Paymaster address already matches</td><td>Dollar-native fees at scale</td></tr>
+      </table>
+    </div>
+    <p class="lead" style="margin-top:16px">Agentic follow-on: our mandate engine + Arc Nanopayments = machines paying machines in dollars, under human-set caps.</p>
+  </div>
+</section>
+
+<!-- 11 · ASK -->
+<section class="slide" id="s11">
+  <span class="num">11 / 11</span>
+  <div class="inner title-hero">
+    <svg class="logoW" style="width:120px" viewBox="30 55 140 70" aria-hidden="true">
+      <g fill="#3ED9B8" stroke="#3ED9B8" stroke-width="2.6" stroke-linecap="round">
+        <line x1="50" y1="80" x2="80" y2="100"/><line x1="80" y1="100" x2="100" y2="80"/>
+        <line x1="100" y1="80" x2="120" y2="100"/><line x1="120" y1="100" x2="150" y2="80"/>
+        <circle cx="50" cy="80" r="6"/><circle cx="80" cy="100" r="6"/><circle cx="100" cy="80" r="6"/>
+        <circle cx="120" cy="100" r="6"/><circle cx="150" cy="80" r="6"/>
+      </g>
+    </svg>
+    <h2 style="margin-bottom:14px">The ask: a place in the Arc accelerator.</h2>
+    <p class="lead" style="margin:0 auto 24px">We'll use the 8 weeks to ship the mesh transport, run a live corridor pilot on mainnet, and make Wayamesh the reference consumer app for dollars on Arc. This is the thing we'll still be building in six months — because it's the thing our own communities need.</p>
+    <span class="pill"><span class="dotp"></span>Tevin Isaac<span class="dot-sep">·</span>Wayamesh<span class="dot-sep">·</span>github.com/Tevin-Isaac/wayamesh-mobile</span>
+    <div class="wordmark" style="margin-top:34px">WAYAMESH</div>
+    <div style="font:12px var(--mono); color:var(--dim); margin-top:8px; letter-spacing:1px">SEND USDC · NO INTERNET</div>
+  </div>
+</section>
+
+<script>
+  const slides = [...document.querySelectorAll('.slide')];
+  const rail = document.getElementById('rail');
+  slides.forEach((s, i) => {
+    const a = document.createElement('a');
+    a.href = '#' + s.id; a.setAttribute('aria-label', 'Slide ' + (i + 1));
+    rail.appendChild(a);
+  });
+  const dots = [...rail.children];
+  const io = new IntersectionObserver((es) => {
+    es.forEach(e => { if (e.isIntersecting) {
+      const i = slides.indexOf(e.target);
+      dots.forEach((d, j) => d.classList.toggle('on', i === j));
+    }});
+  }, { threshold: 0.55 });
+  slides.forEach(s => io.observe(s));
+  addEventListener('keydown', (e) => {
+    const cur = dots.findIndex(d => d.classList.contains('on'));
+    if (e.key === 'ArrowDown' || e.key === 'PageDown' || e.key === ' ') { e.preventDefault(); slides[Math.min(cur + 1, slides.length - 1)].scrollIntoView({ behavior: 'smooth' }); }
+    if (e.key === 'ArrowUp' || e.key === 'PageUp') { e.preventDefault(); slides[Math.max(cur - 1, 0)].scrollIntoView({ behavior: 'smooth' }); }
+  });
+</script>
