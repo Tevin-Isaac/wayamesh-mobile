@@ -45,7 +45,7 @@
   .card.glow { border-color: var(--mint); box-shadow: 0 0 24px rgba(62,217,184,.14); }
   .grid { display: grid; gap: 14px; }
   .g2 { grid-template-columns: repeat(2, 1fr); } .g3 { grid-template-columns: repeat(3, 1fr); }
-  @media (max-width: 760px) { .g2, .g3 { grid-template-columns: 1fr; } }
+  @media screen and (max-width: 760px) { .g2, .g3 { grid-template-columns: 1fr; } }
 
   .stat { font: 700 clamp(26px, 3.6vw, 40px)/1.1 var(--mono); letter-spacing: -1px; font-variant-numeric: tabular-nums; }
   .stat small { display: block; font: 12px var(--sans); color: var(--muted); letter-spacing: .4px; margin-top: 8px; }
@@ -76,7 +76,7 @@
   .rail { position: fixed; right: 14px; top: 50%; transform: translateY(-50%); z-index: 9; display: flex; flex-direction: column; gap: 8px; }
   .rail a { width: 7px; height: 7px; border-radius: 50%; background: var(--border); display: block; transition: background .2s, transform .2s; }
   .rail a.on { background: var(--mint); transform: scale(1.35); }
-  @media (max-width: 760px) { .rail { display: none; } }
+  @media screen and (max-width: 760px) { .rail { display: none; } }
 
   .hint { position: fixed; bottom: 16px; left: 50%; transform: translateX(-50%); z-index: 9;
     font: 11px var(--mono); color: var(--dim); letter-spacing: 1px; }
