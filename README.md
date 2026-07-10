@@ -8,8 +8,8 @@ Built for the **Build on Arc** hackathon.
 
 | | |
 |---|---|
-| **Direct APK** | [Download Wayamesh beta](https://expo.dev/artifacts/eas/XUakjXmm0kc1WGuS3YSO3j8_hmvh_4zXEde8q8Y5TFs.apk) |
-| **Build page + QR code** | [expo.dev build](https://expo.dev/accounts/tevinprime66/projects/wayamesh-mobile/builds/d21184bc-75c2-4e78-bad0-bde5a0d466c8) |
+| **Direct APK** | [Download Wayamesh beta](https://expo.dev/artifacts/eas/KPWBtZ61hRWQGlKtn6q_kxsfBJEhpw4HR97MOIXQFps.apk) |
+| **Build page + QR code** | [expo.dev build](https://expo.dev/accounts/tevinprime66/projects/wayamesh-mobile/builds/5f9bac0b-29ad-4c97-b514-6f9d892eb4d0) |
 
 > Runs on **Arc Testnet** — get free test USDC at [faucet.circle.com](https://faucet.circle.com) (select Arc Testnet). iOS TestFlight coming soon.
 
@@ -26,7 +26,7 @@ Over half of Sub-Saharan Africa is unbanked, and connectivity is intermittent. M
 - **Chat + pay** — message contacts and send USDC inside the thread; incoming payments show up as bubbles automatically.
 - **Incoming payment detection** — background sync spots transfers to your address (both ERC-20 and native) and posts them to your activity + chat.
 - **Gasless smart account (beta)** — Circle Smart Account + Circle Paymaster: pay gas in USDC itself, no separate gas token.
-- **Agent wallet (beta)** — spending mandates (per-tx / daily / total caps, allowlists, expiry) enforced locally so an AI agent can pay on your behalf, safely.
+- **Agent wallet (beta)** — spending mandates (per-tx / daily / total caps, allowlists, expiry) enforced locally, plus **standing payments that execute fully offline**: due payments pass the mandate gate, sign with no connection, and settle on Arc at reconnect.
 - **Recovery** — seed phrase, PIN-protected cloud backup, and Shamir guardian shards.
 - **Add money / cash out** — provider-hosted on/off-ramp module (env-gated; faucet fallback on testnet).
 - **USSD companion** (prototype in [`ussd-service/`](ussd-service/)) — feature-phone access via `*XXX#` menus.
