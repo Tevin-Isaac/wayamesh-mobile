@@ -7,7 +7,7 @@
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "dark",
     "splash": {
-      "image": "./assets/wayamesh-w-mint.png",
+      "image": "./assets/wayamesh-mark.png",
       "resizeMode": "contain",
       "backgroundColor": "#07070F"
     },
@@ -40,7 +40,10 @@
       ]
     },
     "scheme": "wayamesh",
-    "platforms": ["ios", "android"],
+    "platforms": [
+      "ios",
+      "android"
+    ],
     "plugins": [
       "expo-router",
       "expo-camera",
@@ -51,8 +54,8 @@
         "expo-splash-screen",
         {
           "backgroundColor": "#07070F",
-          "image": "./assets/wayamesh-w-mint.png",
-          "imageWidth": 240,
+          "image": "./assets/wayamesh-mark.png",
+          "imageWidth": 200,
           "resizeMode": "contain"
         }
       ],

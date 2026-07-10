@@ -48,7 +48,7 @@ export default function OnboardingScreen() {
 
         {/* top: W logo + WAYAMESH wordmark */}
         <View style={styles.brand}>
-          <Image source={require('../assets/wayamesh-w-mint.png')} style={styles.logo} resizeMode="contain" />
+          <Image source={require('../assets/wayamesh-mark.png')} style={styles.logo} resizeMode="contain" />
           <Text style={styles.wordmark}>WAYAMESH</Text>
         </View>
 
@@ -110,7 +110,7 @@ const styles = StyleSheet.create({
   content: { flex: 1, justifyContent: 'space-between', paddingHorizontal: SPACING.lg, paddingTop: SPACING.lg, paddingBottom: SPACING.xl },
 
   brand: { alignItems: 'center', gap: SPACING.sm },
-  logo: { width: 132, height: 44 },
+  logo: { width: 84, height: 84 },
   wordmark: { fontFamily: FONTS.sans, fontSize: 14, fontWeight: '800', color: COLORS.accent, letterSpacing: 6 },
 
   middle: { alignItems: 'center', gap: SPACING.sm },
