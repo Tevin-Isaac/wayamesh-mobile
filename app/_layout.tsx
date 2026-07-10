@@ -186,6 +186,14 @@ export default function RootLayout() {
           options={{ headerShown: false, animation: 'slide_from_right' }}
         />
         <Stack.Screen
+          name="payment-qr"
+          options={{ presentation: 'modal', headerTitle: 'Offline handoff', ...MODAL_HEADER }}
+        />
+        <Stack.Screen
+          name="receive-payment"
+          options={{ presentation: 'modal', headerTitle: 'Incoming payment', ...MODAL_HEADER }}
+        />
+        <Stack.Screen
           name="ramp"
           options={{ presentation: 'modal', headerTitle: 'Add money', ...MODAL_HEADER }}
         />

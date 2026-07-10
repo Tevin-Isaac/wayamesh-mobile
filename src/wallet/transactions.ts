@@ -181,10 +181,23 @@ export async function settleOnChain(
   chain: ChainConfig = ACTIVE_CHAIN,
 ): Promise<string> {
   return withRpc(async p => {
-    const response = await p.broadcastTransaction(rawSigned);
-    await response.wait(1);
-    updateTransactionStatus(hash, 'settled', response.hash);
-    return response.hash;
+    try {
+      const response = await p.broadcastTransaction(rawSigned);
+      await response.wait(1);
+      updateTransactionStatus(hash, 'settled', response.hash);
+      return response.hash;
+    } catch (err) {
+      // With QR/BLE handoff, several devices can hold the same signed tx —
+      // whoever reconnects first settles it, and the others' broadcast then
+      // fails ("already known" / "nonce too low"). Check the chain before
+      // treating that as an error.
+      const receipt = await p.getTransactionReceipt(hash);
+      if (receipt && receipt.status === 1) {
+        updateTransactionStatus(hash, 'settled', hash);
+        return hash;
+      }
+      throw err;
+    }
   }, chain);
 }
 

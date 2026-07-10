@@ -59,6 +59,13 @@ export function saveTransaction(tx: Omit<TransactionRow, 'created_at' | 'settled
   );
 }
 
+export function getTransactionByHash(hash: string): TransactionRow | null {
+  const db = getDb();
+  return db.getFirstSync<TransactionRow>(
+    'SELECT * FROM transactions WHERE hash = ?', [hash],
+  );
+}
+
 export function getTransactions(limit = 50): TransactionRow[] {
   const db = getDb();
   return db.getAllSync<TransactionRow>(

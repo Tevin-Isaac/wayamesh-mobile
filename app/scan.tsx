@@ -4,6 +4,7 @@ import { CameraView, useCameraPermissions } from 'expo-camera';
 import { router } from 'expo-router';
 import { ethers } from 'ethers';
 import { Ionicons } from '@expo/vector-icons';
+import { isEnvelope } from '@/mesh/envelope';
 import { COLORS } from '@/constants/theme';
 
 export default function ScanScreen() {
@@ -20,6 +21,14 @@ export default function ScanScreen() {
 
   function handleBarcode({ data }: { data: string }) {
     if (scanned) return;
+
+    // Offline payment handoff — the QR *is* a signed transaction
+    if (isEnvelope(data)) {
+      setScanned(true);
+      Vibration.vibrate(60);
+      router.replace({ pathname: '/receive-payment', params: { payload: data.trim() } });
+      return;
+    }
 
     // Accept bare addresses or ethereum: URIs (e.g. ethereum:0x…)
     const raw = data.startsWith('ethereum:') ? data.slice(9).split('?')[0] : data.trim();
@@ -77,7 +86,7 @@ export default function ScanScreen() {
           <View style={styles.overlaySide} />
         </View>
         <View style={styles.overlayBottom}>
-          <Text style={styles.hint}>Point camera at a wallet address QR code</Text>
+          <Text style={styles.hint}>Scan a wallet address or an offline payment code</Text>
         </View>
       </View>
 

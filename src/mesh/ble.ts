@@ -74,13 +74,10 @@ export function scanForPeers(onPeer: (device: DeviceType) => void): () => void {
  * Each write is a self-describing JSON frame {h,i,n,d} so the receiver can
  * reassemble in order and confirm it has all n chunks before broadcasting.
  *
- * NOTE: this is the SENDING (central) half. A peer can only *receive* a relay if
- * it runs a GATT server / advertises as a peripheral — which react-native-ble-plx
- * does not support. Bidirectional mesh requires a peripheral transport (a native
- * BLE-peripheral module on Android, or Nearby Connections / MultipeerConnectivity).
- * Until that lands, relayTransaction is a no-op against non-existent peers; the
- * working settlement path is the sender's own device reconnecting (see
- * settlePendingTransactions).
+ * This is the SENDING (central) half; the receiving half is the native
+ * peripheral in modules/wayamesh-ble (advertises the service + GATT server
+ * that reassembles these frames). Frame sizes assume an MTU of 512, which we
+ * request right after connecting.
  */
 export async function relayTransaction(
   rawSigned: string,
@@ -95,6 +92,9 @@ export async function relayTransaction(
 
   try {
     const device = await ble.connectToDevice(peerId);
+    // Chunk frames are ~360 bytes after JSON + base64 overhead; the 23-byte
+    // default MTU would reject them. 512 is universally negotiable on 5.0+.
+    try { await device.requestMTU(512); } catch { /* stack may auto-negotiate */ }
     await device.discoverAllServicesAndCharacteristics();
 
     const data   = Buffer.from(rawSigned, 'utf8').toString('base64');

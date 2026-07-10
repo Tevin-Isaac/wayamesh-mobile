@@ -41,6 +41,7 @@ export default function SendScreen() {
   const [phase, setPhase] = useState<Phase>('entry');
   const [error, setError] = useState('');
   const [contacts, setContacts] = useState<Contact[]>([]);
+  const [txHash, setTxHash] = useState('');
 
   useEffect(() => { if (scannedAddress) setTo(scannedAddress); }, [scannedAddress]);
   useEffect(() => { try { setContacts(getContacts()); } catch { /* db not ready */ } }, []);
@@ -70,7 +71,8 @@ export default function SendScreen() {
     try {
       const wallet = await unlock();
       if (!wallet) { setPhase('entry'); return; }
-      await buildOfflineTransfer(wallet, to, amt);
+      const tx = await buildOfflineTransfer(wallet, to, amt);
+      setTxHash(tx.hash);
       setPhase('relaying');
       setTimeout(() => setPhase('done'), 1000);
     } catch (e) {
@@ -80,7 +82,7 @@ export default function SendScreen() {
   }
 
   if (phase !== 'entry') {
-    return <SendAnimation phase={phase} amount={num.toFixed(2)} to={to} onDone={() => router.replace('/(tabs)')} />;
+    return <SendAnimation phase={phase} amount={num.toFixed(2)} to={to} txHash={txHash} onDone={() => router.replace('/(tabs)')} />;
   }
 
   return (
@@ -158,7 +160,7 @@ export default function SendScreen() {
   );
 }
 
-function SendAnimation({ phase, amount, to, onDone }: { phase: Phase; amount: string; to: string; onDone: () => void }) {
+function SendAnimation({ phase, amount, to, txHash, onDone }: { phase: Phase; amount: string; to: string; txHash: string; onDone: () => void }) {
   const breathe = useRef(new Animated.Value(1)).current;
   useEffect(() => {
     if (phase === 'done') return;
@@ -187,6 +189,16 @@ function SendAnimation({ phase, amount, to, onDone }: { phase: Phase; amount: st
           </View>
           <Text style={styles.successNote}>Signed offline — it settles on Arc the moment you reconnect.</Text>
         </View>
+        {!!txHash && (
+          <TouchableOpacity
+            style={styles.handoffBtn}
+            onPress={() => router.replace({ pathname: '/payment-qr', params: { hash: txHash } })}
+            activeOpacity={0.85}
+          >
+            <Ionicons name="qr-code-outline" size={17} color={COLORS.accent} />
+            <Text style={styles.handoffText}>Hand to receiver via QR</Text>
+          </TouchableOpacity>
+        )}
         <TouchableOpacity style={styles.cta} onPress={onDone} activeOpacity={0.85}>
           <Text style={styles.ctaText}>Done</Text>
         </TouchableOpacity>
@@ -266,6 +278,12 @@ const styles = StyleSheet.create({
   },
   ctaOff: { opacity: 0.4 },
   ctaText: { color: COLORS.bg, fontWeight: '700', fontSize: 17 },
+  handoffBtn: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
+    borderRadius: RADIUS.md, paddingVertical: 15,
+    borderWidth: 1, borderColor: 'rgba(62,217,184,0.4)', backgroundColor: COLORS.accentSoft,
+  },
+  handoffText: { color: COLORS.accent, fontWeight: '700', fontSize: 15 },
 
   // animation
   animCenter: { flex: 1, alignItems: 'center', justifyContent: 'center' },
