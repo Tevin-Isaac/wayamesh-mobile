@@ -8,8 +8,8 @@ Built for the **Build on Arc** hackathon.
 
 | | |
 |---|---|
-| **Direct APK** | [Download Wayamesh beta](https://expo.dev/artifacts/eas/KPWBtZ61hRWQGlKtn6q_kxsfBJEhpw4HR97MOIXQFps.apk) |
-| **Build page + QR code** | [expo.dev build](https://expo.dev/accounts/tevinprime66/projects/wayamesh-mobile/builds/5f9bac0b-29ad-4c97-b514-6f9d892eb4d0) |
+| **Download APK** | [wayamesh-beta.apk — always the latest build](https://github.com/Tevin-Isaac/wayamesh-mobile/releases/latest/download/wayamesh-beta.apk) |
+| **All releases** | [Release notes & previous versions](https://github.com/Tevin-Isaac/wayamesh-mobile/releases) |
 
 > Runs on **Arc Testnet** — get free test USDC at [faucet.circle.com](https://faucet.circle.com) (select Arc Testnet). iOS TestFlight coming soon.
 
