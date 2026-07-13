@@ -80,7 +80,7 @@ export function scanForPeers(onPeer: (device: DeviceType) => void): () => void {
  * request right after connecting.
  */
 export async function relayTransaction(
-  rawSigned: string,
+  payload: string,   // full payment envelope (or bare signed tx from old callers)
   txHash: string,
   peerId: string,
 ): Promise<boolean> {
@@ -97,7 +97,7 @@ export async function relayTransaction(
     try { await device.requestMTU(512); } catch { /* stack may auto-negotiate */ }
     await device.discoverAllServicesAndCharacteristics();
 
-    const data   = Buffer.from(rawSigned, 'utf8').toString('base64');
+    const data   = Buffer.from(payload, 'utf8').toString('base64');
     const chunks = Math.ceil(data.length / CHUNK_SIZE);
     for (let i = 0; i < chunks; i++) {
       const frame = JSON.stringify({

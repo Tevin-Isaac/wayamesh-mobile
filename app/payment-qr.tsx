@@ -6,6 +6,7 @@ import QRCode from 'react-native-qrcode-svg';
 import { Ionicons } from '@expo/vector-icons';
 import { StatusDot } from '@/components/pro';
 import { getTransactionByHash } from '@/db/queries';
+import { useWallet } from '@/hooks/useWallet';
 import { encodeEnvelope } from '@/mesh/envelope';
 import { getContact } from '@/db/chat';
 import { COLORS, SPACING, RADIUS, FONTS } from '@/constants/theme';
@@ -16,6 +17,7 @@ import type { TransactionRow } from '@/db/queries';
 
 export default function PaymentQrScreen() {
   const { hash } = useLocalSearchParams<{ hash: string }>();
+  const { address } = useWallet();
   const [tx, setTx] = useState<TransactionRow | null>(null);
 
   // Poll so the status pill flips to Settled live if either side reconnects.
@@ -37,6 +39,11 @@ export default function PaymentQrScreen() {
   const who = getContact(tx.to_address.toLowerCase())?.name
     ?? `${tx.to_address.slice(0, 8)}…${tx.to_address.slice(-6)}`;
   const settled = tx.status === 'settled';
+  // If we're carrying someone else's payment, stamp ourselves as courier so
+  // the recipient's agent can tip us on delivery.
+  const isCourier = !!address
+    && tx.from_address.toLowerCase() !== address.toLowerCase()
+    && tx.to_address.toLowerCase() !== address.toLowerCase();
 
   return (
     <SafeAreaView style={styles.container} edges={['bottom']}>
@@ -53,7 +60,7 @@ export default function PaymentQrScreen() {
             </View>
           ) : (
             <QRCode
-              value={encodeEnvelope(tx.raw_signed)}
+              value={encodeEnvelope(tx.raw_signed, isCourier ? address ?? undefined : undefined)}
               size={252}
               backgroundColor="#FFFFFF"
               color="#07070F"

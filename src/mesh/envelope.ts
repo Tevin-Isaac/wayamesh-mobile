@@ -10,6 +10,8 @@ import { ACTIVE_CHAIN } from '@/constants/chain';
 // can alter it. It travels over any transport: QR code today, BLE next.
 
 export const ENVELOPE_PREFIX = 'WMTX1:';
+// v2 adds transport metadata (courier payout address) around the same signed tx.
+export const ENVELOPE_PREFIX_V2 = 'WMTX2:';
 
 const ERC20_IFACE = new ethers.Interface([
   'function transfer(address to, uint256 amount) returns (bool)',
@@ -28,14 +30,25 @@ export interface DecodedEnvelope {
   rawSigned: string;
   nonce: number;
   chainId: number;
+  /**
+   * Payout address of the mesh courier who delivered this envelope, if it
+   * arrived via relay. Transport metadata only — NOT covered by the payment
+   * signature, so it must never be trusted for anything beyond a voluntary,
+   * mandate-gated tip.
+   */
+  courier?: string;
 }
 
-export function encodeEnvelope(rawSigned: string): string {
+export function encodeEnvelope(rawSigned: string, courier?: string): string {
+  if (courier && ethers.isAddress(courier)) {
+    return ENVELOPE_PREFIX_V2 + JSON.stringify({ t: rawSigned, c: courier });
+  }
   return ENVELOPE_PREFIX + rawSigned;
 }
 
 export function isEnvelope(payload: string): boolean {
-  return payload.trim().startsWith(ENVELOPE_PREFIX);
+  const p = payload.trim();
+  return p.startsWith(ENVELOPE_PREFIX) || p.startsWith(ENVELOPE_PREFIX_V2);
 }
 
 /**
@@ -44,10 +57,21 @@ export function isEnvelope(payload: string): boolean {
  */
 export function decodeEnvelope(payload: string): DecodedEnvelope {
   const trimmed = payload.trim();
-  if (!trimmed.startsWith(ENVELOPE_PREFIX)) {
+  let rawSigned: string;
+  let courier: string | undefined;
+
+  if (trimmed.startsWith(ENVELOPE_PREFIX_V2)) {
+    let meta: { t?: string; c?: string };
+    try { meta = JSON.parse(trimmed.slice(ENVELOPE_PREFIX_V2.length)); }
+    catch { throw new Error('Corrupted payment — bad envelope metadata'); }
+    if (typeof meta.t !== 'string') throw new Error('Corrupted payment — missing transaction');
+    rawSigned = meta.t;
+    if (typeof meta.c === 'string' && ethers.isAddress(meta.c)) courier = ethers.getAddress(meta.c);
+  } else if (trimmed.startsWith(ENVELOPE_PREFIX)) {
+    rawSigned = trimmed.slice(ENVELOPE_PREFIX.length);
+  } else {
     throw new Error('Not a Wayamesh payment code');
   }
-  const rawSigned = trimmed.slice(ENVELOPE_PREFIX.length);
 
   let tx: ethers.Transaction;
   try {
@@ -92,5 +116,9 @@ export function decodeEnvelope(payload: string): DecodedEnvelope {
     rawSigned,
     nonce: tx.nonce,
     chainId: Number(tx.chainId),
+    // A courier tipping themselves as sender/recipient is meaningless.
+    courier: courier && courier.toLowerCase() !== from.toLowerCase() && courier.toLowerCase() !== to.toLowerCase()
+      ? courier
+      : undefined,
   };
 }

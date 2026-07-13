@@ -7,6 +7,7 @@ import { Avatar } from '@/components/pro';
 import { useWallet } from '@/hooks/useWallet';
 import { decodeEnvelope, type DecodedEnvelope } from '@/mesh/envelope';
 import { ingestEnvelope, type IngestRole } from '@/mesh/ingest';
+import { tipCourier, COURIER_TIP_USDC, type TipOutcome } from '@/mesh/courier';
 import { getContact } from '@/db/chat';
 import { COLORS, SPACING, RADIUS, FONTS } from '@/constants/theme';
 
@@ -15,9 +16,10 @@ import { COLORS, SPACING, RADIUS, FONTS } from '@/constants/theme';
 
 export default function ReceivePaymentScreen() {
   const { payload } = useLocalSearchParams<{ payload: string }>();
-  const { address } = useWallet();
+  const { address, unlock } = useWallet();
   const [accepted, setAccepted] = useState<IngestRole | null>(null);
   const [duplicate, setDuplicate] = useState(false);
+  const [tip, setTip] = useState<TipOutcome | null>(null);
   const [error, setError] = useState('');
 
   const env: DecodedEnvelope | null = useMemo(() => {
@@ -30,12 +32,18 @@ export default function ReceivePaymentScreen() {
   const forMe = !!env && !!address && env.to.toLowerCase() === address.toLowerCase();
   const fromName = env ? (getContact(env.from.toLowerCase())?.name ?? `${env.from.slice(0, 8)}…${env.from.slice(-6)}`) : '';
 
-  function accept() {
+  async function accept() {
     if (!env || !payload) return;
     try {
       const res = ingestEnvelope(payload, address, 'qr');
       if (res.status === 'duplicate') setDuplicate(true);
       setAccepted(res.role);
+      // Mesh economics: if a courier delivered this to its recipient, the
+      // recipient's agent tips them — inside the mandate envelope, offline.
+      if (res.status === 'accepted' && res.role === 'recipient' && env.courier) {
+        const wallet = await unlock();
+        if (wallet) setTip(await tipCourier(wallet, env.courier));
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Could not accept payment');
     }
@@ -78,6 +86,15 @@ export default function ReceivePaymentScreen() {
             <Ionicons name="flash-outline" size={15} color={COLORS.accent} />
             <Text style={styles.pillText}>Settles on Arc when this phone is online</Text>
           </View>
+          {tip?.status === 'tipped' && (
+            <View style={styles.pill}>
+              <Ionicons name="sparkles-outline" size={15} color={COLORS.accent} />
+              <Text style={styles.pillText}>Your agent tipped the courier {tip.amount} USDC</Text>
+            </View>
+          )}
+          {tip?.status === 'denied' && (
+            <Text style={styles.tipDenied}>Courier tip blocked by your mandate — {tip.reason}</Text>
+          )}
           <Text style={styles.note}>
             You hold the signed transaction now — the sender doesn't need to
             reconnect. No one can alter or cancel it once it settles.
@@ -169,6 +186,7 @@ const styles = StyleSheet.create({
     borderRadius: RADIUS.md, padding: SPACING.md,
   },
   warnText: { flex: 1, fontSize: 12, color: COLORS.warning, lineHeight: 18 },
+  tipDenied: { fontSize: 12, color: COLORS.textDim, marginTop: SPACING.sm, textAlign: 'center' },
 
   factCard: {
     width: '100%', marginTop: SPACING.lg,

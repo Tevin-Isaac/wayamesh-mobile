@@ -1,6 +1,6 @@
 import WayameshBle, { isPeripheralSupported } from '../../modules/wayamesh-ble';
 import { requestBlePermissions } from './ble';
-import { encodeEnvelope } from './envelope';
+import { encodeEnvelope, isEnvelope } from './envelope';
 import { ingestEnvelope, type IngestResult } from './ingest';
 
 // Receiving side of the BLE handoff: advertise as a Wayamesh peripheral,
@@ -27,7 +27,10 @@ export async function startReceiving(
 
   const sub = native.addListener('onEnvelopeReceived', ({ rawSigned }) => {
     try {
-      onPayment(ingestEnvelope(encodeEnvelope(rawSigned), myAddress, 'ble'));
+      // Peers send a full envelope (may carry courier metadata); older builds
+      // send the bare signed tx — wrap those for compatibility.
+      const payload = isEnvelope(rawSigned) ? rawSigned : encodeEnvelope(rawSigned);
+      onPayment(ingestEnvelope(payload, myAddress, 'ble'));
     } catch (e) {
       onError?.(e instanceof Error ? e.message : 'Received an invalid payment');
     }

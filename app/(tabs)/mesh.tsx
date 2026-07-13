@@ -6,6 +6,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { requestBlePermissions, scanForPeers, bleIsAvailable, relayTransaction } from '@/mesh/ble';
 import { startReceiving, isPeripheralSupported } from '@/mesh/peripheral';
+import { encodeEnvelope } from '@/mesh/envelope';
+import { tipCourier } from '@/mesh/courier';
 import { getPendingTransactions, type TransactionRow } from '@/db/queries';
 import { useWallet } from '@/hooks/useWallet';
 import { Eyebrow } from '@/components/pro';
@@ -18,7 +20,7 @@ interface PeerDevice {
 }
 
 export default function MeshScreen() {
-  const { address } = useWallet();
+  const { address, unlock } = useWallet();
 
   const [scanning, setScanning] = useState(false);
   const [peers, setPeers] = useState<PeerDevice[]>([]);
@@ -36,11 +38,12 @@ export default function MeshScreen() {
 
   const refreshPending = useCallback(() => {
     try {
-      const mine = getPendingTransactions().filter(
-        (t) => !!address && t.from_address.toLowerCase() === address.toLowerCase(),
+      // Beamable: my own outgoing payments + payments I'm carrying as courier.
+      const beamable = getPendingTransactions().filter(
+        (t) => !!address && t.to_address.toLowerCase() !== address.toLowerCase(),
       );
-      setPending(mine);
-      setSelectedHash((cur) => (mine.some((t) => t.hash === cur) ? cur : mine[0]?.hash ?? null));
+      setPending(beamable);
+      setSelectedHash((cur) => (beamable.some((t) => t.hash === cur) ? cur : beamable[0]?.hash ?? null));
     } catch { /* db not ready */ }
   }, [address]);
 
@@ -67,14 +70,24 @@ export default function MeshScreen() {
     try {
       const stop = await startReceiving(
         address,
-        (res) => {
+        async (res) => {
           refreshPending();
           const amt = Number(res.envelope.amount).toFixed(2);
+          let tipLine = '';
+          // Agent economics: tip the courier who delivered my payment.
+          if (res.status === 'accepted' && res.role === 'recipient' && res.envelope.courier) {
+            const wallet = await unlock();
+            if (wallet) {
+              const tip = await tipCourier(wallet, res.envelope.courier);
+              if (tip.status === 'tipped') tipLine = `\n\nYour agent tipped the courier ${tip.amount} USDC.`;
+              else if (tip.status === 'denied') tipLine = `\n\nCourier tip blocked by your mandate (${tip.reason}).`;
+            }
+          }
           Alert.alert(
             res.status === 'duplicate' ? 'Already received' : res.role === 'recipient' ? 'Payment received' : 'Payment picked up',
-            res.role === 'recipient'
+            (res.role === 'recipient'
               ? `$${amt} USDC over Bluetooth — settles on Arc when you're online.`
-              : `Now carrying $${amt} USDC for ${res.envelope.to.slice(0, 8)}… — it settles when you're online.`,
+              : `Now carrying $${amt} USDC for ${res.envelope.to.slice(0, 8)}… — it settles when you're online.`) + tipLine,
           );
         },
         (msg) => Alert.alert('Rejected payment', msg),
@@ -114,7 +127,10 @@ export default function MeshScreen() {
     }
     setBeamingTo(peer.id);
     try {
-      const ok = await relayTransaction(tx.raw_signed, tx.hash, peer.id);
+      // Carrying someone else's payment? Stamp ourselves as courier for the tip.
+      const carried = !!address && tx.from_address.toLowerCase() !== address.toLowerCase();
+      const payload = encodeEnvelope(tx.raw_signed, carried ? address ?? undefined : undefined);
+      const ok = await relayTransaction(payload, tx.hash, peer.id);
       Alert.alert(
         ok ? 'Handed off' : 'Handoff failed',
         ok
@@ -190,7 +206,7 @@ export default function MeshScreen() {
                   />
                   <Text style={styles.txAmt}>${Number(t.amount).toFixed(2)}</Text>
                   <Text style={styles.txTo} numberOfLines={1}>
-                    to {t.to_address.slice(0, 8)}…{t.to_address.slice(-6)}
+                    {address && t.from_address.toLowerCase() !== address.toLowerCase() ? 'carrying · ' : ''}to {t.to_address.slice(0, 8)}…{t.to_address.slice(-6)}
                   </Text>
                 </TouchableOpacity>
               ))
