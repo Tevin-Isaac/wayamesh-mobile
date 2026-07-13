@@ -186,6 +186,10 @@ export default function RootLayout() {
           options={{ headerShown: false, animation: 'slide_from_right' }}
         />
         <Stack.Screen
+          name="agent-chat"
+          options={{ presentation: 'modal', headerTitle: 'Ask your wallet', ...MODAL_HEADER }}
+        />
+        <Stack.Screen
           name="payment-qr"
           options={{ presentation: 'modal', headerTitle: 'Offline handoff', ...MODAL_HEADER }}
         />

@@ -3,6 +3,7 @@ import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert,
   KeyboardAvoidingView, Platform, ActivityIndicator,
 } from 'react-native';
+import { router } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ethers } from 'ethers';
 import { Ionicons } from '@expo/vector-icons';
@@ -221,6 +222,16 @@ export default function AgentScreen() {
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.kav}>
         <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
 
+          {/* chat with your wallet */}
+          <TouchableOpacity style={styles.askCard} onPress={() => router.push('/agent-chat')} activeOpacity={0.85}>
+            <View style={styles.askIcon}><Ionicons name="sparkles" size={18} color={COLORS.bg} /></View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.askTitle}>Ask your wallet</Text>
+              <Text style={styles.askSub}>"Pay Amina 2 USDC every Friday" — it proposes, you approve</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={18} color={COLORS.textDim} />
+          </TouchableOpacity>
+
           {policy && rem ? (
             <>
               {/* spending envelope */}
@@ -398,6 +409,19 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: COLORS.bg },
   kav:       { flex: 1 },
   content:   { padding: SPACING.lg, paddingBottom: SPACING.xxl },
+
+  askCard: {
+    flexDirection: 'row', alignItems: 'center', gap: 12,
+    backgroundColor: COLORS.surface, borderWidth: 1, borderColor: 'rgba(62,217,184,0.4)',
+    borderRadius: RADIUS.lg, padding: SPACING.md, marginBottom: SPACING.md,
+    shadowColor: COLORS.accent, shadowOpacity: 0.18, shadowRadius: 12, shadowOffset: { width: 0, height: 4 }, elevation: 4,
+  },
+  askIcon: {
+    width: 38, height: 38, borderRadius: 12, backgroundColor: COLORS.accent,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  askTitle: { fontSize: 15, fontWeight: '700', color: COLORS.text },
+  askSub: { fontSize: 12, color: COLORS.textMuted, marginTop: 2 },
 
   // envelope
   envelope: {
