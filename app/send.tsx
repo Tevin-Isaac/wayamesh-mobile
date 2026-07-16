@@ -184,10 +184,10 @@ function SendAnimation({ phase, amount, to, txHash, onDone }: { phase: Phase; am
           <Text style={styles.successAmount}>${amount}</Text>
           <Text style={styles.successSub}>sent to <Text style={styles.successWho}>{shortTo}</Text></Text>
           <View style={styles.relayPill}>
-            <Ionicons name="radio-outline" size={15} color={COLORS.accent} />
-            <Text style={styles.relayPillText}>Relaying over mesh</Text>
+            <Ionicons name="flash-outline" size={15} color={COLORS.accent} />
+            <Text style={styles.relayPillText}>Signed offline</Text>
           </View>
-          <Text style={styles.successNote}>Signed offline — it settles on Arc the moment you reconnect.</Text>
+          <Text style={styles.successNote}>Settles on Arc the moment you reconnect. Hand it over by QR to let the receiver settle it first.</Text>
         </View>
         {!!txHash && (
           <TouchableOpacity
@@ -206,9 +206,9 @@ function SendAnimation({ phase, amount, to, txHash, onDone }: { phase: Phase; am
     );
   }
 
-  const label = phase === 'signing' ? 'Signing offline' : 'Relaying over mesh';
-  const sub = phase === 'signing' ? 'Securing with your on-device key' : 'Hopping peer-to-peer via Bluetooth';
-  const icon = phase === 'signing' ? 'lock-closed' : 'radio';
+  const label = phase === 'signing' ? 'Signing offline' : 'Queued to settle';
+  const sub = phase === 'signing' ? 'Securing with your on-device key' : 'Settles on Arc the moment you reconnect';
+  const icon = phase === 'signing' ? 'lock-closed' : 'flash';
   const stepIndex = ['signing', 'relaying', 'done'].indexOf(phase);
 
   return (

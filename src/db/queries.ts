@@ -48,6 +48,20 @@ export function clearWalletData(): void {
   db.runSync('DELETE FROM transactions');
   db.runSync('DELETE FROM mesh_relays');
   db.runSync('UPDATE sync_log SET last_block_synced = 0, last_sync_time = 0 WHERE id = 1');
+
+  // Wipe every other wallet-scoped table so a NEW wallet on this device never
+  // inherits the previous owner's agent mandate, standing payments, spend
+  // counters, contacts, chat, cached nonces, or PIN lockout. The agent/chat
+  // tables are created lazily, so guard each DELETE — a missing table is fine.
+  const wipe = (sql: string) => { try { db.runSync(sql); } catch { /* table not yet created */ } };
+  wipe('DELETE FROM agent_policy');
+  wipe('DELETE FROM agent_state');
+  wipe('DELETE FROM agent_instructions');
+  wipe('DELETE FROM agent_audit');
+  wipe('DELETE FROM contacts');
+  wipe('DELETE FROM chat_messages');
+  wipe('DELETE FROM nonce_cache');
+  wipe("UPDATE pin_security SET attempt_count = 0, locked_until = 0 WHERE id = 1");
 }
 
 // Transaction queries
