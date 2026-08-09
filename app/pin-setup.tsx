@@ -46,6 +46,7 @@ export default function PassphraseSetupScreen() {
     if (!canSubmit) return;
     setLoading(true);
     setError('');
+    await new Promise(resolve => setTimeout(resolve, 0));
     try {
       const walletRow = getWallet();
       const walletAddress = address ?? walletRow?.address;
