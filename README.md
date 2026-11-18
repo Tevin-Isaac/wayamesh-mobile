@@ -36,8 +36,16 @@ Any phone can also act as a **courier**: carry a third party's payment to the in
 - **Agent wallet (beta)** — a spending envelope the AI/automation can never exceed: per-tx / daily / total caps, allowlists, expiry — enforced on-device by a deterministic policy engine with a full audit log. **Standing payments execute fully offline**: due payments pass the mandate gate, sign locally, and settle at reconnect.
 - **Gasless smart account (beta)** — Circle Smart Account + Circle Paymaster: pay gas in USDC itself.
 - **Recovery, three ways** — seed phrase, PIN-protected cloud backup, and Shamir guardian shards.
-- **Add money / cash out** — provider-hosted on/off-ramp module (env-gated; faucet fallback on testnet).
+- **Add money / cash out** — M-Pesa via the `server/` Daraja backend (mock/sandbox/production modes) plus an optional hosted card/bank provider; faucet fallback on testnet.
 - **USSD companion** (prototype in [`ussd-service/`](ussd-service/)) — feature-phone access via `*XXX#` menus.
+
+## What's new in this update
+
+- **Provable offline payments (MeshPayV2).** Pre-fund an on-chain *offline reserve*; offline payments are EIP-712 vouchers drawn from it, so a receiver can check "Funded" before accepting. Any phone can settle a voucher and keeps its small courier fee (0.01 USDC). Receiver risk limit: max $100 unsettled per payer. Contract on Arc Testnet: `0xd619b77bb8389a632800c300969ef152099f7691` (24h withdrawal delay). With no reserve, sending falls back to a plain signed transfer.
+- **M-Pesa on/off-ramp.** [`server/`](server/README.md) is a small Daraja backend (STK Push in, B2C out) with a mock mode for demos. The app's Add money / Cash out screen talks to it via `EXPO_PUBLIC_RAMP_API_URL`. Testnet demo rate only; real money needs Arc mainnet, Safaricom go-live and legal review.
+- **Web app** ([`web/`](web/README.md)). The website is now a working wallet that follows the phone's flow: onboarding, PIN, backup, wallet, send/receive, chats, history, mesh (QR handoff — browsers have no Bluetooth), agent mandates, reserve, ramp, settings. Phone and web share the `mp2:` voucher format and the same seed gives the same address.
+
+Not covered by tests yet: funded end-to-end deposit/settle/withdraw (needs a funded wallet on a real device), and the ramp against live Safaricom.
 
 ## Built on Arc
 
@@ -73,7 +81,8 @@ npx eas-cli build --platform android --profile preview
 
 No environment variables are required for testnet. Optional:
 
-- `EXPO_PUBLIC_RAMP_PROVIDER` / `EXPO_PUBLIC_RAMP_API_KEY` — enable the on/off-ramp module (mainnet only)
+- `EXPO_PUBLIC_RAMP_API_URL` — URL of the `server/` ramp backend (enables M-Pesa add money / cash out)
+- `EXPO_PUBLIC_RAMP_PROVIDER` / `EXPO_PUBLIC_RAMP_API_KEY` — optional hosted card/bank provider (mainnet only)
 
 ## Project structure
 
