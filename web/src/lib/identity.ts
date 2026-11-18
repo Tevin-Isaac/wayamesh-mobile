@@ -49,3 +49,11 @@ export function accountFromSecret(secret: Secret): Account {
 export function addressOf(secret: Secret): Address {
   return getAddress(accountFromSecret(secret).address)
 }
+
+/** The 32-byte wallet private key as 0x hex. Used only to derive the separate chat key; never stored or sent. */
+export function walletPrivateKeyOf(secret: Secret): Hex {
+  if (secret.kind === 'privateKey') return secret.value
+  const k = mnemonicToAccount(secret.value).getHdKey().privateKey
+  if (!k) throw new Error('Could not read the wallet key.')
+  return `0x${Array.from(k, (b) => b.toString(16).padStart(2, '0')).join('')}` as Hex
+}

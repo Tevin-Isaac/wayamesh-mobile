@@ -4,7 +4,8 @@
  */
 import { useSyncExternalStore } from 'react'
 import type { Address } from 'viem'
-import { accountFromSecret, newMnemonic, parseSecret, type Account, type Secret } from './identity'
+import { accountFromSecret, newMnemonic, parseSecret, walletPrivateKeyOf, type Account, type Secret } from './identity'
+import { deriveChatKey } from './chat/crypto'
 import {
   clearFailures,
   clearVault,
@@ -31,6 +32,8 @@ export interface SessionSnapshot {
 let status: SessionStatus = 'none'
 let address: Address | null = null
 let account: Account | null = null
+/** Chat key derived from the wallet key at unlock (HKDF, separate from the signing key). Memory only, like the account. */
+let chatKey: string | null = null
 let pending: Secret | null = null
 let hasMnemonic = false
 let freshPhrase: string | null = null
@@ -79,6 +82,11 @@ export function getAccount(): Account {
   return account
 }
 
+export function getChatKey(): string {
+  if (!chatKey) throw new LockedError()
+  return chatKey
+}
+
 export function isUnlocked() {
   return status === 'unlocked'
 }
@@ -123,6 +131,7 @@ export async function setPin(pin: string, iterations?: number): Promise<void> {
   saveVault(rec)
   clearFailures()
   account = accountFromSecret(pending)
+  chatKey = deriveChatKey(walletPrivateKeyOf(pending))
   address = account.address
   hasMnemonic = pending.kind === 'mnemonic'
   freshPhrase = pending.kind === 'mnemonic' ? pending.value : null
@@ -145,6 +154,7 @@ export async function unlockWithPin(pin: string): Promise<UnlockResult> {
   try {
     const secret = await decryptSecret(rec, pin)
     account = accountFromSecret(secret)
+    chatKey = deriveChatKey(walletPrivateKeyOf(secret))
     address = account.address
     hasMnemonic = secret.kind === 'mnemonic'
     status = 'unlocked'
@@ -171,6 +181,7 @@ export function lock() {
   if (status !== 'unlocked') return
   freshPhrase = null
   account = null
+  chatKey = null
   status = 'locked'
   hasMnemonic = false
   bindStore(null)
@@ -183,6 +194,7 @@ export function logout() {
   const prev = address
   freshPhrase = null
   account = null
+  chatKey = null
   pending = null
   address = null
   hasMnemonic = false

@@ -3,6 +3,7 @@ import { useSession } from '@/lib/session'
 import { useT } from '@/lib/i18n'
 import { Icon, type IconName } from './Icon'
 import { Toaster } from './ui'
+import { useChatRelay } from '@/lib/chat/service'
 
 const TABS: { to: string; key: string; fallback: string; icon: IconName; end?: boolean }[] = [
   { to: '/app', key: 'wallet.title', fallback: 'Wallet', icon: 'wallet', end: true },
@@ -19,6 +20,7 @@ export function Shell() {
   const s = useSession()
   const loc = useLocation()
   const { t } = useT()
+  useChatRelay() // chat relay subscription while unlocked
   if (s.status === 'none') return <Navigate to="/app/onboarding" replace />
   if (s.status === 'pending') return <Navigate to="/app/pin-setup" replace />
   if (s.status === 'locked') return <Navigate to="/app/unlock" replace />

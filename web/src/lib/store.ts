@@ -1,7 +1,7 @@
 /**
  * Wallet-scoped app data (payments, contacts, chats, agent mandate, ramp orders), kept in localStorage under the
  * wallet address. Nothing here is a secret: the signing key lives only in the PIN-encrypted vault. Everything is
- * wiped on sign-out. Not synced anywhere: chat text is device-local, exactly as on the phone app.
+ * wiped on sign-out. Not synced anywhere: chat history is device-local; messages travel end-to-end encrypted over public relays (see lib/chat).
  */
 import { useSyncExternalStore } from 'react'
 import type { Address, Hex } from 'viem'
@@ -44,6 +44,13 @@ export interface Contact {
   address: Address
   name: string
   addedAt: number
+  /** Chat public key from a verified contact card (hex, no 0x). Absent for address-only contacts. */
+  pubkey?: string
+  verified?: boolean
+  /** Unknown sender who messaged first, not yet accepted. */
+  request?: boolean
+  /** Optional plain-text label. Never used for lookup or sent anywhere. */
+  phone?: string
 }
 
 export interface ChatMessage {
@@ -55,6 +62,14 @@ export interface ChatMessage {
   amount?: string
   itemId?: string
   ts: number
+  /** Protocol message id (dedup + delivery receipts). */
+  mid?: string
+  /** out: queued -> sent (relays accepted) -> delivered (peer acknowledged). in: received | invalid. */
+  status?: 'queued' | 'sent' | 'delivered' | 'received' | 'invalid'
+  /** Payment code carried by a payment message. */
+  code?: string
+  /** Outgoing sealed mpm1: code waiting to be sent. */
+  sealed?: string
 }
 
 export interface StoredPolicy {
@@ -117,6 +132,8 @@ export interface Data {
   orders: OrderRef[]
   settings: Settings
   cache: { reserve?: string; balance?: string; at?: number }
+  /** Chat bookkeeping: signed contact card (public) and the newest relay event seen. */
+  chat: { card?: string; since?: number }
 }
 
 export const emptyData = (): Data => ({
@@ -128,6 +145,7 @@ export const emptyData = (): Data => ({
   orders: [],
   settings: { autoSettle: false, acceptLimit: '25', autoLockMinutes: 5 },
   cache: {},
+  chat: {},
 })
 
 const PREFIX = 'wayamesh.data.v1:'
@@ -149,6 +167,7 @@ function load(address: string): Data {
         agent: { ...base.agent, ...(parsed.agent ?? {}) },
         settings: { ...base.settings, ...(parsed.settings ?? {}) },
         cache: { ...(parsed.cache ?? {}) },
+        chat: { ...(parsed.chat ?? {}) },
       }
     }
   } catch {
@@ -241,6 +260,51 @@ export function getContact(address: string): Contact | undefined {
 export function addMessage(m: Omit<ChatMessage, 'id' | 'ts'>) {
   const msg: ChatMessage = { ...m, id: crypto.randomUUID(), ts: Date.now() }
   commit({ ...data, messages: [...data.messages, msg] })
+}
+
+/** Adds a fully formed message (chat service). Returns false when the protocol id was already stored. */
+export function putMessage(m: Omit<ChatMessage, 'id'>): boolean {
+  if (m.mid && data.messages.some((x) => x.mid === m.mid)) return false
+  commit({ ...data, messages: [...data.messages, { ...m, id: crypto.randomUUID() }] })
+  purgeChat()
+  return true
+}
+
+export const MESSAGE_TTL_MS = 24 * 3600 * 1000
+export const MAX_MESSAGES_PER_THREAD = 200
+export const MAX_MESSAGES_TOTAL = 1000
+
+/**
+ * Chat messages self-delete after 24h; each thread keeps at most 200 and the store at most 1000 (oldest dropped first).
+ * Touches ONLY `messages`: contacts, items (payments and their settlement status), activity and chat meta are kept.
+ * Returns how many messages were removed.
+ */
+export function purgeChat(now = Date.now()): number {
+  const before = data.messages.length
+  let kept = data.messages.filter((m) => m.ts + MESSAGE_TTL_MS > now)
+  const perPeer = new Map<string, number>()
+  for (let i = kept.length - 1; i >= 0; i--) {
+    const k = kept[i].peer.toLowerCase()
+    const n = (perPeer.get(k) ?? 0) + 1
+    perPeer.set(k, n)
+    if (n > MAX_MESSAGES_PER_THREAD) kept = kept.filter((_, j) => j !== i)
+  }
+  if (kept.length > MAX_MESSAGES_TOTAL) kept = kept.slice(kept.length - MAX_MESSAGES_TOTAL)
+  if (kept.length === before) return 0
+  commit({ ...data, messages: kept })
+  return before - kept.length
+}
+
+export function patchMessage(mid: string, patch: Partial<ChatMessage>) {
+  commit({ ...data, messages: data.messages.map((m) => (m.mid === mid ? { ...m, ...patch } : m)) })
+}
+
+export function patchContact(address: string, patch: Partial<Contact>) {
+  commit({ ...data, contacts: data.contacts.map((c) => (c.address.toLowerCase() === address.toLowerCase() ? { ...c, ...patch } : c)) })
+}
+
+export function setChatMeta(patch: Partial<Data['chat']>) {
+  commit({ ...data, chat: { ...data.chat, ...patch } })
 }
 
 export function setSettings(patch: Partial<Settings>) {
