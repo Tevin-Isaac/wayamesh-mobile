@@ -169,9 +169,16 @@ class WayameshBleModule : Module() {
     }
   }
 
-  /** Frame protocol: base64(JSON {h: txHash, i: index, n: total, d: base64 slice}). */
+  /**
+   * Frame protocol: JSON {h: txHash, i: index, n: total, d: base64 slice}.
+   * The central (react-native-ble-plx) hands us the raw JSON bytes; older
+   * builds wrapped them in an extra base64 layer, so accept both.
+   */
   private fun handleFrame(deviceAddress: String, value: ByteArray) {
-    val frame = JSONObject(String(Base64.decode(value, Base64.DEFAULT), Charsets.UTF_8))
+    val text = String(value, Charsets.UTF_8)
+    val json = if (text.trimStart().startsWith("{")) text
+               else String(Base64.decode(value, Base64.DEFAULT), Charsets.UTF_8)
+    val frame = JSONObject(json)
     val hash = frame.getString("h")
     val index = frame.getInt("i")
     val total = frame.getInt("n")
