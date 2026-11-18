@@ -1,57 +1,53 @@
 import { useState, useCallback } from 'react';
-import {
-  View, Text, StyleSheet, TouchableOpacity, ScrollView, Modal, TextInput, Alert,
-} from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { ethers } from 'ethers';
-import { Avatar, Eyebrow } from '@/components/pro';
-import { getConversations, addContact, type Conversation } from '@/db/chat';
+import { Avatar } from '@/components/pro';
+import { getConversations, type Conversation } from '@/db/chat';
+import { onChatChange, pool, startChat, useRelayStatus } from '@/chat/service';
 import { COLORS, SPACING, RADIUS } from '@/constants/theme';
 
 export default function ChatScreen() {
   const [convos, setConvos] = useState<Conversation[]>([]);
-  const [adding, setAdding] = useState(false);
-  const [name, setName] = useState('');
-  const [addr, setAddr] = useState('');
+  const relay = useRelayStatus();
 
   const refresh = useCallback(() => setConvos(getConversations()), []);
-  useFocusEffect(useCallback(() => { refresh(); }, [refresh]));
+  useFocusEffect(useCallback(() => { refresh(); if (!pool.active) void startChat(); return onChatChange(refresh); }, [refresh]));
 
   function preview(c: Conversation): string {
-    if (!c.lastKind) return 'Tap to start chatting';
-    if (c.lastKind === 'payment') return `💸 ${c.lastAmount} USDC`;
-    return c.lastBody ?? '';
-  }
-
-  function save() {
-    const a = addr.trim();
-    if (!ethers.isAddress(a)) { Alert.alert('Invalid address', 'Enter a valid 0x wallet address'); return; }
-    if (!name.trim()) { Alert.alert('Name required', 'Give this contact a name'); return; }
-    addContact(a, name.trim());
-    setAdding(false); setName(''); setAddr('');
-    refresh();
-    router.push({ pathname: '/chat-thread', params: { peer: a.toLowerCase(), name: name.trim() } });
+    if (!c.lastKind) return c.pubkey ? 'Tap to start chatting' : 'Add their card to chat';
+    if (c.lastKind === 'payment') return `${c.lastDir === 'out' ? 'You sent' : 'Payment'} ${c.lastAmount} USDC`;
+    return (c.lastDir === 'out' ? 'You: ' : '') + (c.lastBody ?? '');
   }
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       <View style={styles.header}>
         <Text style={styles.heading}>Chats</Text>
-        <TouchableOpacity style={styles.newBtn} onPress={() => setAdding(true)} activeOpacity={0.8}>
-          <Ionicons name="create-outline" size={20} color={COLORS.bg} />
-        </TouchableOpacity>
+        <View style={{ flexDirection: 'row', gap: 8 }}>
+          <TouchableOpacity style={styles.ghostBtn} onPress={() => router.push('/my-card')} activeOpacity={0.8}>
+            <Ionicons name="qr-code-outline" size={20} color={COLORS.accent} />
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.newBtn} onPress={() => router.push('/add-contact')} activeOpacity={0.8}>
+            <Ionicons name="person-add-outline" size={20} color={COLORS.bg} />
+          </TouchableOpacity>
+        </View>
       </View>
+      <Text style={styles.net}>
+        {relay.connected > 0
+          ? `Online. Messages are end-to-end encrypted (${relay.connected} of ${relay.total} relays connected).`
+          : 'Not connected. Messages will be sent when you are back online.'}
+      </Text>
 
       <ScrollView contentContainerStyle={styles.scroll}>
         {convos.length === 0 ? (
           <View style={styles.empty}>
             <Ionicons name="chatbubbles-outline" size={40} color={COLORS.textDim} />
             <Text style={styles.emptyTitle}>No conversations yet</Text>
-            <Text style={styles.emptyHint}>Add a contact to chat and send USDC in the same place.</Text>
-            <TouchableOpacity style={styles.emptyBtn} onPress={() => setAdding(true)} activeOpacity={0.85}>
-              <Text style={styles.emptyBtnText}>New chat</Text>
+            <Text style={styles.emptyHint}>Add a contact by scanning their card, or show them yours. Then chat and send USDC in the same place.</Text>
+            <TouchableOpacity style={styles.emptyBtn} onPress={() => router.push('/add-contact')} activeOpacity={0.85}>
+              <Text style={styles.emptyBtnText}>Add contact</Text>
             </TouchableOpacity>
           </View>
         ) : (
@@ -64,7 +60,7 @@ export default function ChatScreen() {
             >
               <Avatar seed={c.name || c.address} size={48} />
               <View style={styles.rowBody}>
-                <Text style={styles.rowName}>{c.name}</Text>
+                <Text style={styles.rowName}>{c.name}{c.request ? '  (request)' : ''}</Text>
                 <Text style={styles.rowPreview} numberOfLines={1}>{preview(c)}</Text>
               </View>
               {c.lastAt ? <Text style={styles.rowTime}>{new Date(c.lastAt * 1000).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}</Text> : null}
@@ -72,37 +68,6 @@ export default function ChatScreen() {
           ))
         )}
       </ScrollView>
-
-      {/* new contact modal */}
-      <Modal visible={adding} transparent animationType="fade" onRequestClose={() => setAdding(false)}>
-        <View style={styles.modalBackdrop}>
-          <View style={styles.modalCard}>
-            <Eyebrow>New chat</Eyebrow>
-            <TextInput
-              style={styles.input} value={name} onChangeText={setName}
-              placeholder="Contact name" placeholderTextColor={COLORS.textDim}
-            />
-            <View style={styles.addrRow}>
-              <TextInput
-                style={[styles.input, { flex: 1, marginBottom: 0 }]} value={addr} onChangeText={setAddr}
-                placeholder="Wallet address 0x…" placeholderTextColor={COLORS.textDim}
-                autoCapitalize="none" autoCorrect={false}
-              />
-              <TouchableOpacity onPress={() => { setAdding(false); router.push('/scan'); }} activeOpacity={0.7} style={styles.scanBtn}>
-                <Ionicons name="qr-code-outline" size={20} color={COLORS.accent} />
-              </TouchableOpacity>
-            </View>
-            <View style={styles.modalActions}>
-              <TouchableOpacity onPress={() => setAdding(false)} activeOpacity={0.7} style={styles.cancelBtn}>
-                <Text style={styles.cancelText}>Cancel</Text>
-              </TouchableOpacity>
-              <TouchableOpacity onPress={save} activeOpacity={0.85} style={styles.saveBtn}>
-                <Text style={styles.saveText}>Start chat</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </Modal>
     </SafeAreaView>
   );
 }
@@ -111,6 +76,8 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: COLORS.bg },
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: SPACING.lg, paddingTop: SPACING.md },
   heading: { fontSize: 28, fontWeight: '700', color: COLORS.text, letterSpacing: -0.3 },
+  ghostBtn: { width: 40, height: 40, borderRadius: 20, borderWidth: 1, borderColor: COLORS.accent, alignItems: 'center', justifyContent: 'center' },
+  net: { paddingHorizontal: SPACING.lg, paddingTop: SPACING.sm, fontSize: 12, color: COLORS.textDim },
   newBtn: { width: 40, height: 40, borderRadius: 20, backgroundColor: COLORS.accent, alignItems: 'center', justifyContent: 'center' },
   scroll: { padding: SPACING.lg, paddingTop: SPACING.md },
 

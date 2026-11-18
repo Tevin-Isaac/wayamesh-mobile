@@ -15,7 +15,9 @@ const TX_CHAR_UUID = 'c0de0002-cafe-beef-dead-000000000002';
 
 // BLE characteristic writes are small; we frame the signed tx as length-prefixed
 // chunks so the receiving peer can reassemble and verify completeness.
-const CHUNK_SIZE = 180; // safe below the 185-byte default ATT MTU payload
+// Each write is a JSON frame (~100 B overhead incl. the 66-char id) + this many base64 chars.
+// 96 keeps the largest write under ~190 bytes, which fits the MTU phones commonly negotiate.
+const CHUNK_SIZE = 96;
 
 let _manager: BleManagerType | null = null;
 let _bleAvailable: boolean | null = null;
@@ -34,9 +36,15 @@ function isBleAvailable(): boolean {
 function getBleManager(): BleManagerType | null {
   if (!isBleAvailable()) return null;
   if (!_manager) {
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
-    const { BleManager } = require('react-native-ble-plx');
-    _manager = new BleManager();
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-var-requires
+      const { BleManager } = require('react-native-ble-plx');
+      _manager = new BleManager();
+    } catch {
+      // Expo Go / no native module / Bluetooth stack unavailable: behave as "no Bluetooth", never crash.
+      _bleAvailable = false;
+      return null;
+    }
   }
   return _manager;
 }
@@ -44,12 +52,17 @@ function getBleManager(): BleManagerType | null {
 export async function requestBlePermissions(): Promise<boolean> {
   if (!isBleAvailable()) return false;
   if (Platform.OS === 'android') {
-    const grants = await PermissionsAndroid.requestMultiple([
-      PermissionsAndroid.PERMISSIONS.BLUETOOTH_SCAN,
-      PermissionsAndroid.PERMISSIONS.BLUETOOTH_CONNECT,
-      PermissionsAndroid.PERMISSIONS.BLUETOOTH_ADVERTISE,
-      PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
-    ]);
+    // Android 12+ (API 31) has dedicated Bluetooth permissions. Android 10-11 does not
+    // know them (asking would always report "denied") and needs location for scanning.
+    const api = typeof Platform.Version === 'number' ? Platform.Version : parseInt(String(Platform.Version), 10);
+    const wanted = api >= 31
+      ? [
+          PermissionsAndroid.PERMISSIONS.BLUETOOTH_SCAN,
+          PermissionsAndroid.PERMISSIONS.BLUETOOTH_CONNECT,
+          PermissionsAndroid.PERMISSIONS.BLUETOOTH_ADVERTISE,
+        ]
+      : [PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION];
+    const grants = await PermissionsAndroid.requestMultiple(wanted);
     return Object.values(grants).every((g) => g === PermissionsAndroid.RESULTS.GRANTED);
   }
   return true;
@@ -61,11 +74,16 @@ export function scanForPeers(onPeer: (device: DeviceType) => void): () => void {
     console.log('[BLE] Not available in Expo Go — scan skipped');
     return () => {};
   }
-  ble.startDeviceScan([SERVICE_UUID], null, (error: unknown, device: DeviceType | null) => {
-    if (error || !device) return;
-    onPeer(device);
-  });
-  return () => ble.stopDeviceScan();
+  try {
+    // Errors (Bluetooth off, permission revoked) arrive in the callback and are ignored: the UI shows "no peers".
+    ble.startDeviceScan([SERVICE_UUID], null, (error: unknown, device: DeviceType | null) => {
+      if (error || !device) return;
+      onPeer(device);
+    });
+  } catch {
+    return () => {};
+  }
+  return () => { try { ble.stopDeviceScan(); } catch { /* ignore */ } };
 }
 
 /**
@@ -110,7 +128,8 @@ export async function relayTransaction(
       await device.writeCharacteristicWithResponseForService(SERVICE_UUID, TX_CHAR_UUID, encoded);
     }
 
-    logMeshRelay(txHash, peerId);
+    // Chat messages (mpm1:, EXPERIMENTAL) are not transactions: mesh_relays has a foreign key to transactions.
+    if (!payload.startsWith('mpm1:')) logMeshRelay(txHash, peerId);
     await device.cancelConnection();
     return true;
   } catch {

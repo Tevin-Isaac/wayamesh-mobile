@@ -4,6 +4,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import { router } from 'expo-router';
 import { requestBlePermissions, scanForPeers, bleIsAvailable, relayTransaction } from '@/mesh/ble';
 import { startReceiving, isPeripheralSupported } from '@/mesh/peripheral';
 import { encodeEnvelope } from '@/mesh/envelope';
@@ -53,6 +54,16 @@ export default function MeshScreen() {
     return () => clearInterval(t);
   }, [refreshPending]);
 
+  // Opening the Mesh tab makes this phone discoverable by default, so nearby phones can
+  // find it without hunting for a switch. Silent on failure (Bluetooth off / no permission).
+  const autoStarted = useRef(false);
+  useEffect(() => {
+    if (autoStarted.current || !canReceive || !address) return;
+    autoStarted.current = true;
+    toggleReceive(true, true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [address, canReceive]);
+
   useEffect(() => {
     return () => {
       stopScan?.();
@@ -60,7 +71,7 @@ export default function MeshScreen() {
     };
   }, [stopScan]);
 
-  async function toggleReceive(val: boolean) {
+  async function toggleReceive(val: boolean, silent = false) {
     if (!val) {
       await stopReceivingRef.current?.();
       stopReceivingRef.current = null;
@@ -95,7 +106,7 @@ export default function MeshScreen() {
       stopReceivingRef.current = stop;
       setReceiving(true);
     } catch (e) {
-      Alert.alert('Cannot receive', e instanceof Error ? e.message : 'Bluetooth error');
+      if (!silent) Alert.alert('Cannot receive', e instanceof Error ? e.message : 'Bluetooth error');
     }
   }
 
@@ -106,8 +117,15 @@ export default function MeshScreen() {
       setStopScan(null);
       return;
     }
-    const granted = await requestBlePermissions();
-    if (!granted) return;
+    let granted = false;
+    try { granted = await requestBlePermissions(); } catch { granted = false; }
+    if (!granted) {
+      Alert.alert('Bluetooth not available', 'Bluetooth permission was denied or Bluetooth is off. You can still hand over payments with a QR code or text.', [
+        { text: 'Scan a code', onPress: () => router.push('/scan') },
+        { text: 'OK', style: 'cancel' },
+      ]);
+      return;
+    }
     setPeers([]);
     setScanning(true);
     const stop = scanForPeers((device) => {
@@ -154,10 +172,20 @@ export default function MeshScreen() {
 
             {!bleAvailable && (
               <View style={[styles.card, styles.warnCard]}>
-                <Text style={styles.warnTitle}>Bluetooth unavailable</Text>
+                <Text style={styles.warnTitle}>Bluetooth not available - use QR or text instead</Text>
                 <Text style={styles.warnText}>
-                  The mesh needs a development or production build — it can't run in Expo Go.
+                  Bluetooth hand-off needs an Android build with Bluetooth on. Everything else works without it: payments and chat go over the internet, or you can hand over a QR code or payment text.
                 </Text>
+                <View style={{ flexDirection: 'row', gap: 10, marginTop: 10 }}>
+                  <TouchableOpacity onPress={() => router.push('/scan')} activeOpacity={0.8}>
+                    <Text style={{ color: COLORS.accent, fontWeight: '700' }}>Scan or paste a code</Text>
+                  </TouchableOpacity>
+                  {selectedHash ? (
+                    <TouchableOpacity onPress={() => router.push({ pathname: '/payment-qr', params: { hash: selectedHash } })} activeOpacity={0.8}>
+                      <Text style={{ color: COLORS.accent, fontWeight: '700' }}>Show QR / share text</Text>
+                    </TouchableOpacity>
+                  ) : null}
+                </View>
               </View>
             )}
 
@@ -254,9 +282,16 @@ export default function MeshScreen() {
           </TouchableOpacity>
         )}
         ListEmptyComponent={
-          scanning ? (
-            <Text style={styles.dim}>Listening… ask the other phone to enable “Receive via Bluetooth”.</Text>
-          ) : null
+          <View>
+            <Text style={styles.dim}>
+              {scanning
+                ? 'Listening… ask the other phone to enable “Receive via Bluetooth”. No peers found? Use a QR code or text instead.'
+                : 'No Bluetooth needed: you can always hand over a payment with a QR code or text.'}
+            </Text>
+            <TouchableOpacity onPress={() => router.push('/scan')} activeOpacity={0.8} style={{ marginTop: 8 }}>
+              <Text style={{ color: COLORS.accent, fontWeight: '700' }}>Scan or paste a code</Text>
+            </TouchableOpacity>
+          </View>
         }
       />
     </SafeAreaView>

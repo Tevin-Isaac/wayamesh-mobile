@@ -16,6 +16,7 @@ import { loadWallet } from '@/wallet/keystore';
 import { syncIncoming } from '@/wallet/sync';
 import { getWallet } from '@/db/queries';
 import { getPreferences } from '@/utils/preferences';
+import { startChat, stopChat, flushOutbox, purgeNow } from '@/chat/service';
 import i18n from '@/i18n';
 import { COLORS } from '@/constants/theme';
 
@@ -136,6 +137,19 @@ export default function RootLayout() {
     return () => { sub.remove(); clearInterval(timer); };
   }, []);
 
+  // Chat: subscribe to relays while the app is active (foreground only; nothing runs in the background).
+  useEffect(() => {
+    if (!dbReady) return;
+    purgeNow(); // chat messages self-delete after 24h
+    void startChat(); // no-ops until a wallet and its chat key exist; the Chats tab retries on focus
+    const sub = AppState.addEventListener('change', (next) => {
+      if (next === 'active') { purgeNow(); void startChat(); } else stopChat();
+    });
+    const timer = setInterval(() => { if (AppState.currentState === 'active') void flushOutbox(); }, 30_000);
+    const purgeTimer = setInterval(() => { if (AppState.currentState === 'active') purgeNow(); }, 5 * 60_000);
+    return () => { sub.remove(); clearInterval(timer); clearInterval(purgeTimer); stopChat(); };
+  }, [dbReady]);
+
   // Hold render until brand fonts are ready to avoid a font-swap flash — but
   // fail open: if font loading errors, render anyway with system fonts rather
   // than hanging on a blank screen.
@@ -199,6 +213,14 @@ export default function RootLayout() {
         <Stack.Screen
           name="chat-thread"
           options={{ headerShown: false, animation: 'slide_from_right' }}
+        />
+        <Stack.Screen
+          name="add-contact"
+          options={{ presentation: 'modal', headerTitle: 'Add contact', ...MODAL_HEADER }}
+        />
+        <Stack.Screen
+          name="my-card"
+          options={{ presentation: 'modal', headerTitle: 'My card', ...MODAL_HEADER }}
         />
         <Stack.Screen
           name="agent-chat"

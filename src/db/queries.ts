@@ -62,6 +62,8 @@ export function clearWalletData(): void {
   wipe('DELETE FROM agent_audit');
   wipe('DELETE FROM contacts');
   wipe('DELETE FROM chat_messages');
+  wipe('DELETE FROM chat_meta');
+  wipe('DELETE FROM chat_carried');
   wipe('DELETE FROM nonce_cache');
   wipe('DELETE FROM reserve_cache');
   wipe("UPDATE pin_security SET attempt_count = 0, locked_until = 0 WHERE id = 1");
