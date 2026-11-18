@@ -80,4 +80,10 @@ export async function initDatabase(): Promise<void> {
     INSERT OR IGNORE INTO preferences (id, biometric_enabled, auto_settle_enabled, language)
     VALUES (1, 1, 1, 'en');
   `);
+
+  // v2: transactions can be plain signed transfers ('transfer') or MeshPayV2
+  // vouchers ('voucher'). For vouchers, raw_signed holds the `mp2:` code.
+  try {
+    await database.execAsync("ALTER TABLE transactions ADD COLUMN kind TEXT NOT NULL DEFAULT 'transfer'");
+  } catch { /* column already exists */ }
 }

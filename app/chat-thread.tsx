@@ -7,7 +7,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useWallet } from '@/hooks/useWallet';
-import { buildOfflineTransfer } from '@/wallet/transactions';
+import { sendPayment as pay, planPayment } from '@/wallet/pay';
 import { Avatar } from '@/components/pro';
 import { getMessages, addMessage, getContact, type ChatMessage } from '@/db/chat';
 import { COLORS, SPACING, RADIUS, FONTS } from '@/constants/theme';
@@ -17,7 +17,7 @@ export default function ChatThreadScreen() {
   const peer = (params.peer ?? '').toLowerCase();
   const name = params.name ?? getContact(peer)?.name ?? `${peer.slice(0, 6)}…${peer.slice(-4)}`;
 
-  const { balance, unlock } = useWallet();
+  const { address, balance, unlock } = useWallet();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [text, setText] = useState('');
   const [payMode, setPayMode] = useState(false);
@@ -40,13 +40,15 @@ export default function ChatThreadScreen() {
   async function sendPayment() {
     const amt = parseFloat(amount || '0');
     const bal = balance ? Number(balance) : 0;
-    if (!(amt > 0) || amt > bal - 0.0001) return;
+    const plan = planPayment(address, amount);
+    const available = plan.mode === 'voucher' ? Number(plan.reserve ?? 0) - Number(plan.fee) : bal - 0.0001;
+    if (!(amt > 0) || amt > available) return;
     setSending(true);
     try {
       const wallet = await unlock();
       if (!wallet) { setSending(false); return; }
-      const tx = await buildOfflineTransfer(wallet, peer, amount);
-      addMessage({ peer, direction: 'out', kind: 'payment', amount, txHash: tx.hash, status: 'pending' });
+      const res = await pay(wallet, peer, amount);
+      addMessage({ peer, direction: 'out', kind: 'payment', amount, txHash: res.hash, status: 'pending' });
       setAmount(''); setPayMode(false);
       refresh();
     } catch {

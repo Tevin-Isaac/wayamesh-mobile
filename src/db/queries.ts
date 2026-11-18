@@ -19,6 +19,8 @@ export interface TransactionRow {
   settled_at: number | null;
   arc_tx_hash: string | null;
   raw_signed: string;
+  /** 'transfer' = raw signed tx; 'voucher' = MeshPayV2 `mp2:` voucher. */
+  kind: 'transfer' | 'voucher';
 }
 
 export interface MeshRelayRow {
@@ -61,15 +63,18 @@ export function clearWalletData(): void {
   wipe('DELETE FROM contacts');
   wipe('DELETE FROM chat_messages');
   wipe('DELETE FROM nonce_cache');
+  wipe('DELETE FROM reserve_cache');
   wipe("UPDATE pin_security SET attempt_count = 0, locked_until = 0 WHERE id = 1");
 }
 
 // Transaction queries
-export function saveTransaction(tx: Omit<TransactionRow, 'created_at' | 'settled_at' | 'arc_tx_hash'>): void {
+export function saveTransaction(
+  tx: Omit<TransactionRow, 'created_at' | 'settled_at' | 'arc_tx_hash' | 'kind'> & { kind?: TransactionRow['kind'] },
+): void {
   const db = getDb();
   db.runSync(
-    'INSERT OR REPLACE INTO transactions (hash, from_address, to_address, amount, status, raw_signed) VALUES (?, ?, ?, ?, ?, ?)',
-    [tx.hash, tx.from_address, tx.to_address, tx.amount, tx.status, tx.raw_signed],
+    'INSERT OR REPLACE INTO transactions (hash, from_address, to_address, amount, status, raw_signed, kind) VALUES (?, ?, ?, ?, ?, ?, ?)',
+    [tx.hash, tx.from_address, tx.to_address, tx.amount, tx.status, tx.raw_signed, tx.kind ?? 'transfer'],
   );
 }
 

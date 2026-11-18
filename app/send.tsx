@@ -8,7 +8,7 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { ethers } from 'ethers';
 import { useWallet } from '@/hooks/useWallet';
-import { buildOfflineTransfer } from '@/wallet/transactions';
+import { sendPayment, planPayment, type PayMode } from '@/wallet/pay';
 import { Avatar } from '@/components/pro';
 import { getContacts, getContact, type Contact } from '@/db/chat';
 import { COLORS, SPACING, RADIUS, FONTS } from '@/constants/theme';
@@ -42,6 +42,7 @@ export default function SendScreen() {
   const [error, setError] = useState('');
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [txHash, setTxHash] = useState('');
+  const [sentMode, setSentMode] = useState<PayMode>('direct');
 
   useEffect(() => { if (scannedAddress) setTo(scannedAddress); }, [scannedAddress]);
   useEffect(() => { try { setContacts(getContacts()); } catch { /* db not ready */ } }, []);
@@ -49,7 +50,12 @@ export default function SendScreen() {
   const validTo = ethers.isAddress(to);
   const bal = balance ? Number(balance) : 0;
   const num = parseFloat(amt || '0');
-  const insufficient = num > bal - RESERVE && num > 0;
+  const plan = planPayment(address, amt);
+  const reserveNum = plan.reserve ? Number(plan.reserve) : 0;
+  const feeNum = Number(plan.fee);
+  // Voucher mode spends from the offline reserve; otherwise from the wallet balance.
+  const available = plan.mode === 'voucher' ? reserveNum - feeNum : bal - RESERVE;
+  const insufficient = num > available && num > 0;
   const ready = num > 0 && !insufficient && validTo;
 
   function key(k: string) {
@@ -71,8 +77,9 @@ export default function SendScreen() {
     try {
       const wallet = await unlock();
       if (!wallet) { setPhase('entry'); return; }
-      const tx = await buildOfflineTransfer(wallet, to, amt);
-      setTxHash(tx.hash);
+      const res = await sendPayment(wallet, to, amt);
+      setSentMode(res.mode);
+      setTxHash(res.hash);
       setPhase('relaying');
       setTimeout(() => setPhase('done'), 1000);
     } catch (e) {
@@ -82,7 +89,7 @@ export default function SendScreen() {
   }
 
   if (phase !== 'entry') {
-    return <SendAnimation phase={phase} amount={num.toFixed(2)} to={to} txHash={txHash} onDone={() => router.replace('/(tabs)')} />;
+    return <SendAnimation phase={phase} amount={num.toFixed(2)} to={to} txHash={txHash} mode={sentMode} onDone={() => router.replace('/(tabs)')} />;
   }
 
   return (
@@ -140,7 +147,11 @@ export default function SendScreen() {
           <Text style={styles.amountSymbol}>$</Text>
           <Text style={[styles.amountValue, !amt && styles.amountValueDim]}>{amt || '0'}</Text>
         </View>
-        <Text style={styles.amountSub}>USDC · {bal.toFixed(2)} available</Text>
+        <Text style={styles.amountSub}>
+          {plan.mode === 'voucher'
+            ? `USDC · $${reserveNum.toFixed(2)} in offline reserve · $${plan.fee} courier fee`
+            : `USDC · ${bal.toFixed(2)} in wallet${reserveNum > 0 ? ' (reserve too low for this amount)' : ''}`}
+        </Text>
         {insufficient && <Text style={styles.amountError}>Insufficient balance</Text>}
         {!!error && <Text style={styles.amountError}>{error}</Text>}
       </View>
@@ -154,13 +165,13 @@ export default function SendScreen() {
         activeOpacity={0.85}
       >
         <Ionicons name="lock-closed" size={16} color={COLORS.bg} />
-        <Text style={styles.ctaText}>Sign offline & send</Text>
+        <Text style={styles.ctaText}>{plan.mode === 'voucher' ? 'Sign offline voucher' : 'Sign offline & send'}</Text>
       </TouchableOpacity>
     </SafeAreaView>
   );
 }
 
-function SendAnimation({ phase, amount, to, txHash, onDone }: { phase: Phase; amount: string; to: string; txHash: string; onDone: () => void }) {
+function SendAnimation({ phase, amount, to, txHash, mode, onDone }: { phase: Phase; amount: string; to: string; txHash: string; mode: PayMode; onDone: () => void }) {
   const breathe = useRef(new Animated.Value(1)).current;
   useEffect(() => {
     if (phase === 'done') return;
@@ -187,7 +198,11 @@ function SendAnimation({ phase, amount, to, txHash, onDone }: { phase: Phase; am
             <Ionicons name="flash-outline" size={15} color={COLORS.accent} />
             <Text style={styles.relayPillText}>Signed offline</Text>
           </View>
-          <Text style={styles.successNote}>Settles on Arc the moment you reconnect. Hand it over by QR to let the receiver settle it first.</Text>
+          <Text style={styles.successNote}>
+            {mode === 'voucher'
+              ? 'Backed by your on-chain reserve, so the receiver can verify it is funded. Whichever phone gets online first settles it and keeps the small courier fee.'
+              : 'Settles on Arc the moment you reconnect. Hand it over by QR to let the receiver settle it first.'}
+          </Text>
         </View>
         {!!txHash && (
           <TouchableOpacity

@@ -10,7 +10,9 @@ import { SpaceMono_400Regular, SpaceMono_700Bold } from '@expo-google-fonts/spac
 import { initDatabase } from '@/db/schema';
 import { hasWallet } from '@/wallet/keystore';
 import { backupExists } from '@/wallet/backup';
-import { settlePendingTransactions } from '@/wallet/transactions';
+import { settlePendingTransactions, settlePendingVouchers, countPendingVouchers } from '@/wallet/transactions';
+import { fetchReserve } from '@/wallet/meshpay';
+import { loadWallet } from '@/wallet/keystore';
 import { syncIncoming } from '@/wallet/sync';
 import { getWallet } from '@/db/queries';
 import { getPreferences } from '@/utils/preferences';
@@ -100,6 +102,19 @@ export default function RootLayout() {
       try {
         const addr = getWallet()?.address;
         if (addr) await syncIncoming(addr);
+        // Keep the offline-reserve cache fresh so the sender knows what it can spend.
+        if (addr) await fetchReserve(addr);
+      } catch {
+        // offline — next tick retries
+      }
+      // MeshPayV2 vouchers must be settled by a transaction from THIS phone's
+      // key. With biometric binding on, that needs a prompt, so it happens from
+      // the "Settle now" action; with it off we can settle silently.
+      try {
+        if (countPendingVouchers() > 0 && !getPreferences().biometric_enabled) {
+          const w = await loadWallet();
+          if (w) await settlePendingVouchers(w);
+        }
       } catch {
         // offline — next tick retries
       }
@@ -196,6 +211,10 @@ export default function RootLayout() {
         <Stack.Screen
           name="receive-payment"
           options={{ presentation: 'modal', headerTitle: 'Incoming payment', ...MODAL_HEADER }}
+        />
+        <Stack.Screen
+          name="reserve"
+          options={{ presentation: 'modal', headerTitle: 'Offline reserve', ...MODAL_HEADER }}
         />
         <Stack.Screen
           name="ramp"

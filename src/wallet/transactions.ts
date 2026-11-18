@@ -1,6 +1,8 @@
 import { ethers } from 'ethers';
 import { ACTIVE_CHAIN, type ChainConfig } from '@/constants/chain';
 import { saveTransaction, updateTransactionStatus, getPendingTransactions } from '@/db/queries';
+import { decodeVoucher, type Voucher } from '@/mesh/voucher';
+import { settleVoucher, findSettledTx } from './meshpay';
 import { withRpc } from './rpc';
 import { getEffectiveNonce, setLocalNonce } from './nonce';
 
@@ -213,7 +215,9 @@ export interface SettleResult {
  * harmless no-op on-chain. Returns counts so callers can decide whether to retry.
  */
 export async function settlePendingTransactions(): Promise<SettleResult> {
-  const pending = getPendingTransactions();
+  // Raw transfers need no key to broadcast. Vouchers do (the settler pays gas
+  // and earns the fee) — those go through settlePendingVouchers(wallet).
+  const pending = getPendingTransactions().filter(t => t.kind !== 'voucher');
   let settled = 0;
   let failed  = 0;
   for (const tx of pending) {
@@ -231,4 +235,42 @@ export async function settlePendingTransactions(): Promise<SettleResult> {
 
 export async function getOnChainNonce(address: string): Promise<number> {
   return withRpc(p => p.getTransactionCount(address, 'latest'));
+}
+
+// ── Voucher settlement (MeshPayV2) ────────────────────────────────────────────
+
+export function countPendingVouchers(): number {
+  return getPendingTransactions().filter(t => t.kind === 'voucher').length;
+}
+
+/**
+ * Settle every pending voucher this phone holds. Needs the unlocked wallet
+ * because the settler signs the on-chain call (gas in USDC) and collects each
+ * voucher's courier fee. Already-settled / expired vouchers are reconciled.
+ */
+export async function settlePendingVouchers(wallet: ethers.Wallet): Promise<SettleResult> {
+  const pending = getPendingTransactions().filter(t => t.kind === 'voucher');
+  let settled = 0;
+  let failed  = 0;
+  for (const row of pending) {
+    let v: Voucher;
+    try { v = decodeVoucher(row.raw_signed); }
+    catch { updateTransactionStatus(row.hash, 'failed'); failed++; continue; }
+
+    const out = await settleVoucher(wallet, v);
+    if (out.status === 'settled') {
+      updateTransactionStatus(row.hash, 'settled', out.txHash);
+      settled++;
+    } else if (out.status === 'already') {
+      const arcTx = await findSettledTx(v);
+      updateTransactionStatus(row.hash, 'settled', arcTx ?? undefined);
+      settled++;
+    } else if (out.status === 'failed') {
+      updateTransactionStatus(row.hash, 'failed');
+      failed++;
+    } else {
+      failed++; // waiting — retried on the next attempt
+    }
+  }
+  return { attempted: pending.length, settled, failed };
 }

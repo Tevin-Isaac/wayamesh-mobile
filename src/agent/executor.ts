@@ -1,5 +1,5 @@
 import { ethers } from 'ethers';
-import { buildOfflineTransfer } from '@/wallet/transactions';
+import { sendPayment } from '@/wallet/pay';
 import { getContact, addMessage } from '@/db/chat';
 import { evaluateAndRecord, logAudit, getState } from './store';
 import {
@@ -59,7 +59,7 @@ export async function runDueInstructions(wallet: ethers.Wallet): Promise<Executi
     }
 
     try {
-      const tx = await buildOfflineTransfer(wallet, ins.to_addr, ethers.formatUnits(amount, 6));
+      const tx = await sendPayment(wallet, ins.to_addr, ethers.formatUnits(amount, 6));
       recordRun(ins.id, tx.hash, now);
       logAudit({
         kind: 'execution', to: ins.to_addr, amount,

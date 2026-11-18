@@ -12,5 +12,12 @@
     "**/*.ts",
     "**/*.tsx",
     ".expo/types/**/*.d.ts"
+  ],
+  "exclude": [
+    "node_modules",
+    "web",
+    "server",
+    "ussd-service",
+    "dist"
   ]
 }

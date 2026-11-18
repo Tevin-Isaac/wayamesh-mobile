@@ -1,5 +1,6 @@
 import { ethers } from 'ethers';
 import { ACTIVE_CHAIN } from '@/constants/chain';
+import { decodeVoucher, isVoucherCode, voucherId, offlineRejection, formatUsdc } from './voucher';
 
 // Payment envelope — the unit of offline value transfer.
 //
@@ -37,9 +38,17 @@ export interface DecodedEnvelope {
    * mandate-gated tip.
    */
   courier?: string;
+  /** 'voucher' = MeshPayV2 voucher (`rawSigned` is the mp2: code); 'transfer' = raw signed tx. */
+  kind?: 'transfer' | 'voucher';
+  /** Voucher only: courier fee (USDC) paid to whoever settles. */
+  fee?: string;
+  /** Voucher only: unix-seconds deadline after which it can no longer settle. */
+  deadline?: number;
 }
 
 export function encodeEnvelope(rawSigned: string, courier?: string): string {
+  // Vouchers carry their own courier fee, so they travel as-is.
+  if (isVoucherCode(rawSigned)) return rawSigned.trim();
   if (courier && ethers.isAddress(courier)) {
     return ENVELOPE_PREFIX_V2 + JSON.stringify({ t: rawSigned, c: courier });
   }
@@ -48,7 +57,7 @@ export function encodeEnvelope(rawSigned: string, courier?: string): string {
 
 export function isEnvelope(payload: string): boolean {
   const p = payload.trim();
-  return p.startsWith(ENVELOPE_PREFIX) || p.startsWith(ENVELOPE_PREFIX_V2);
+  return p.startsWith(ENVELOPE_PREFIX) || p.startsWith(ENVELOPE_PREFIX_V2) || isVoucherCode(p);
 }
 
 /**
@@ -57,6 +66,25 @@ export function isEnvelope(payload: string): boolean {
  */
 export function decodeEnvelope(payload: string): DecodedEnvelope {
   const trimmed = payload.trim();
+
+  if (isVoucherCode(trimmed)) {
+    const v = decodeVoucher(trimmed);
+    const reason = offlineRejection(v);
+    if (reason) throw new Error(reason);
+    return {
+      hash: voucherId(v.payment),
+      from: v.payment.from,
+      to: v.payment.to,
+      amount: formatUsdc(v.payment.amount),
+      rawSigned: trimmed,
+      nonce: Number(v.payment.nonce % 2n ** 31n),
+      chainId: ACTIVE_CHAIN.chainId,
+      kind: 'voucher',
+      fee: formatUsdc(v.payment.fee),
+      deadline: Number(v.payment.deadline),
+    };
+  }
+
   let rawSigned: string;
   let courier: string | undefined;
 

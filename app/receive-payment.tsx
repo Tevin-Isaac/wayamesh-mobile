@@ -1,4 +1,6 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { checkVoucherOnChain } from '@/wallet/meshpay';
+import { decodeVoucher } from '@/mesh/voucher';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
@@ -21,6 +23,8 @@ export default function ReceivePaymentScreen() {
   const [duplicate, setDuplicate] = useState(false);
   const [tip, setTip] = useState<TipOutcome | null>(null);
   const [error, setError] = useState('');
+  // Online-only extra: ask the contract whether this voucher is funded right now.
+  const [funded, setFunded] = useState<'checking' | 'yes' | 'no' | 'offline'>('checking');
 
   const env: DecodedEnvelope | null = useMemo(() => {
     try { return payload ? decodeEnvelope(payload) : null; } catch (e) {
@@ -28,6 +32,15 @@ export default function ReceivePaymentScreen() {
       return null;
     }
   }, [payload]);
+
+  useEffect(() => {
+    if (!env || env.kind !== 'voucher' || !payload) return;
+    let live = true;
+    checkVoucherOnChain(decodeVoucher(payload))
+      .then((code) => { if (live) setFunded(code === 0 ? 'yes' : 'no'); })
+      .catch(() => { if (live) setFunded('offline'); });
+    return () => { live = false; };
+  }, [env, payload]);
 
   const forMe = !!env && !!address && env.to.toLowerCase() === address.toLowerCase();
   const fromName = env ? (getContact(env.from.toLowerCase())?.name ?? `${env.from.slice(0, 8)}…${env.from.slice(-6)}`) : '';
@@ -132,6 +145,21 @@ export default function ReceivePaymentScreen() {
           <Fact label="Recipient" value={`${env.to.slice(0, 10)}…${env.to.slice(-8)}`} />
           <Fact label="Network" value={`Arc · chain ${env.chainId}`} />
           <Fact label="Signature" value="Valid — amount & recipient sealed" />
+          {env.kind === 'voucher' && (
+            <>
+              <Fact
+                label="Funded by payer"
+                value={
+                  funded === 'checking' ? 'Checking…'
+                    : funded === 'yes' ? 'Yes — reserve covers it'
+                    : funded === 'no' ? 'No — not funded right now'
+                    : 'Unknown offline — settles later'
+                }
+              />
+              <Fact label="Courier fee" value={`$${env.fee} to whoever settles`} />
+              <Fact label="Valid until" value={new Date((env.deadline ?? 0) * 1000).toLocaleString()} />
+            </>
+          )}
         </View>
       </ScrollView>
 
