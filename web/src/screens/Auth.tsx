@@ -94,7 +94,7 @@ export function Onboarding() {
         <Link to="/app/import" className="btn ghost">{t('onboarding.import', 'Import existing wallet')}</Link>
         <div className="row" style={{ justifyContent: 'center', gap: 20, flexWrap: 'wrap' }}>
           <Link to="/app/restore" className="alt-link">Restore from backup file</Link>
-          <Link to="/" className="alt-link">← Website</Link>
+          <a href="/" className="alt-link">← Website</a>
         </div>
       </div>
     </main>

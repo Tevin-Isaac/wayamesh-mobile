@@ -1,6 +1,5 @@
 import { Route, Routes, Navigate } from 'react-router-dom'
 import { Shell } from './components/Shell'
-import { Landing } from './screens/Landing'
 import { Backup, ImportWallet, Onboarding, PinSetup, Restore, Unlock } from './screens/Auth'
 import { Wallet } from './screens/Wallet'
 import { Chats, ChatThread } from './screens/Chat'
@@ -21,7 +20,7 @@ export default function App() {
   return (
     <>
       <Routes>
-        <Route path="/" element={<Landing />} />
+        <Route path="/" element={<Navigate to="/app" replace />} />
         <Route path="/app/onboarding" element={<Onboarding />} />
         <Route path="/app/import" element={<ImportWallet />} />
         <Route path="/app/restore" element={<Restore />} />
@@ -55,7 +54,7 @@ export default function App() {
           />
           <Route path="*" element={<Navigate to="/app" replace />} />
         </Route>
-        <Route path="*" element={<Navigate to="/" replace />} />
+        <Route path="*" element={<Navigate to="/app" replace />} />
       </Routes>
       <AutoSettle />
     </>

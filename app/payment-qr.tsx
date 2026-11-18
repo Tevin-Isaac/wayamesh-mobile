@@ -79,20 +79,20 @@ export default function PaymentQrScreen() {
                 onPress={() => Share.share({ message: payload }).catch(() => undefined)}
               >
                 <Ionicons name="share-outline" size={16} color={COLORS.accent} />
-                <Text style={styles.shareText}>Share code</Text>
+                <Text style={styles.shareText}>Send as text</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={styles.shareBtn} activeOpacity={0.8}
-                onPress={async () => { await Clipboard.setStringAsync(payload); Alert.alert('Copied', 'Payment code copied. Paste it to the receiver in any chat or message.'); }}
+                onPress={async () => { await Clipboard.setStringAsync(payload); Alert.alert('Copied', 'Copied. The receiver can paste it into Wayamesh instead of scanning.'); }}
               >
                 <Ionicons name="copy-outline" size={16} color={COLORS.accent} />
-                <Text style={styles.shareText}>Copy code</Text>
+                <Text style={styles.shareText}>Copy as text</Text>
               </TouchableOpacity>
             </View>
             <View style={styles.stepRow}>
               <View style={styles.stepIcon}><Ionicons name="scan-outline" size={16} color={COLORS.accent} /></View>
               <Text style={styles.stepText}>
-                The receiver opens Wayamesh → Scan and points at this code.
+                The receiver opens Wayamesh → Scan and points their camera at this QR.
               </Text>
             </View>
             <View style={styles.stepRow}>
@@ -105,8 +105,8 @@ export default function PaymentQrScreen() {
             <View style={styles.stepRow}>
               <View style={styles.stepIcon}><Ionicons name="lock-closed-outline" size={16} color={COLORS.accent} /></View>
               <Text style={styles.stepText}>
-                The code is the transaction itself, sealed by your signature —
-                the amount and recipient cannot be altered by anyone.
+                The QR contains your signed payment. Nobody can change the
+                amount or recipient.
               </Text>
             </View>
           </>

@@ -267,12 +267,12 @@ export function PaymentQr() {
 
         {!settled && !dead && (
           <div className="stack">
-            <div className="step-row"><span className="ico"><Icon name="scan" /></span><span>The receiver opens Wayamesh → Scan and points at this code (or pastes the code below).</span></div>
+            <div className="step-row"><span className="ico"><Icon name="scan" /></span><span>The receiver opens Wayamesh → Scan and points their camera at this QR.</span></div>
             <div className="step-row"><span className="ico"><Icon name="shield" /></span><span>They now hold the signed payment. It settles the instant either device finds internet — they no longer depend on you reconnecting.</span></div>
-            <div className="step-row"><span className="ico"><Icon name="lock" /></span><span>The code is the transaction itself, sealed by your signature — the amount and recipient cannot be altered by anyone.</span></div>
+            <div className="step-row"><span className="ico"><Icon name="lock" /></span><span>The QR contains your signed payment. Nobody can change the amount or recipient.</span></div>
             <div className="row" style={{ gap: 12 }}>
-              <Button variant="secondary" icon="share" onClick={share}>Share code</Button>
-              <Button variant="secondary" icon="copy" onClick={async () => toast((await copyPlain(memoCode)) ? 'Payment code copied.' : 'Could not copy.')}>Copy code</Button>
+              <Button variant="secondary" icon="share" onClick={share}>Send as text instead</Button>
+              <Button variant="secondary" icon="copy" onClick={async () => toast((await copyPlain(memoCode)) ? 'Payment code copied.' : 'Could not copy.')}>Copy as text</Button>
             </div>
             {mine && item.status === 'pending' && online && <Button variant="danger" loading={busy} onClick={cancel}>Cancel payment</Button>}
           </div>

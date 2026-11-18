@@ -42,7 +42,7 @@ export function Shell() {
         <div className="brand"><img src={`${import.meta.env.BASE_URL}mark.png`} alt="" /><span>WAYAMESH</span></div>
         <nav aria-label="Main" style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>{links('side-link')}</nav>
         <div className="side-spacer" />
-        <NavLink to="/" className="side-link"><Icon name="globe" /><span>Website</span></NavLink>
+        <a href="/" className="side-link"><Icon name="globe" /><span>Website</span></a>
         <div className="side-foot">Arc Testnet · web wallet beta</div>
       </aside>
       <main className="shell-main" id="main"><Outlet /></main>
