@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Vibration } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Vibration, Alert } from 'react-native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { router } from 'expo-router';
 import { ethers } from 'ethers';
+import * as Clipboard from 'expo-clipboard';
 import { Ionicons } from '@expo/vector-icons';
 import { isEnvelope } from '@/mesh/envelope';
 import { COLORS } from '@/constants/theme';
@@ -18,6 +19,17 @@ export default function ScanScreen() {
       requestPermission();
     }
   }, [permission]);
+
+  // Paste path: a payment code received as text (WhatsApp, SMS, email…).
+  async function pasteCode() {
+    const text = (await Clipboard.getStringAsync()).trim();
+    if (!text) { Alert.alert('Nothing to paste', 'Copy a payment code (starts with mp2:) first.'); return; }
+    if (!isEnvelope(text) && !ethers.isAddress(text)) {
+      Alert.alert('Not a payment code', 'The copied text is not a Wayamesh payment code or address.');
+      return;
+    }
+    handleBarcode({ data: text });
+  }
 
   function handleBarcode({ data }: { data: string }) {
     if (scanned) return;
@@ -87,6 +99,10 @@ export default function ScanScreen() {
         </View>
         <View style={styles.overlayBottom}>
           <Text style={styles.hint}>Scan a wallet address or an offline payment code</Text>
+          <TouchableOpacity style={styles.pasteBtn} onPress={pasteCode} activeOpacity={0.8}>
+            <Ionicons name="clipboard-outline" size={16} color={COLORS.text} />
+            <Text style={styles.pasteText}>Paste code from clipboard</Text>
+          </TouchableOpacity>
         </View>
       </View>
 
@@ -134,6 +150,12 @@ const styles = StyleSheet.create({
     paddingTop: 24,
   },
   hint: { color: 'rgba(255,255,255,0.7)', fontSize: 14 },
+  pasteBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 14,
+    paddingHorizontal: 18, paddingVertical: 10, borderRadius: 999,
+    backgroundColor: 'rgba(255,255,255,0.12)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.25)',
+  },
+  pasteText: { color: COLORS.text, fontSize: 13.5, fontWeight: '600' },
 
   finder: {
     width: FINDER,

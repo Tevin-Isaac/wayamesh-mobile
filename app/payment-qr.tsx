@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Share, Alert } from 'react-native';
+import * as Clipboard from 'expo-clipboard';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams } from 'expo-router';
 import QRCode from 'react-native-qrcode-svg';
@@ -44,6 +45,7 @@ export default function PaymentQrScreen() {
   const isCourier = !!address
     && tx.from_address.toLowerCase() !== address.toLowerCase()
     && tx.to_address.toLowerCase() !== address.toLowerCase();
+  const payload = encodeEnvelope(tx.raw_signed, isCourier ? address ?? undefined : undefined);
 
   return (
     <SafeAreaView style={styles.container} edges={['bottom']}>
@@ -60,7 +62,7 @@ export default function PaymentQrScreen() {
             </View>
           ) : (
             <QRCode
-              value={encodeEnvelope(tx.raw_signed, isCourier ? address ?? undefined : undefined)}
+              value={payload}
               size={252}
               backgroundColor="#FFFFFF"
               color="#07070F"
@@ -71,6 +73,22 @@ export default function PaymentQrScreen() {
 
         {!settled && (
           <>
+            <View style={styles.shareRow}>
+              <TouchableOpacity
+                style={styles.shareBtn} activeOpacity={0.8}
+                onPress={() => Share.share({ message: payload }).catch(() => undefined)}
+              >
+                <Ionicons name="share-outline" size={16} color={COLORS.accent} />
+                <Text style={styles.shareText}>Share code</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.shareBtn} activeOpacity={0.8}
+                onPress={async () => { await Clipboard.setStringAsync(payload); Alert.alert('Copied', 'Payment code copied. Paste it to the receiver in any chat or message.'); }}
+              >
+                <Ionicons name="copy-outline" size={16} color={COLORS.accent} />
+                <Text style={styles.shareText}>Copy code</Text>
+              </TouchableOpacity>
+            </View>
             <View style={styles.stepRow}>
               <View style={styles.stepIcon}><Ionicons name="scan-outline" size={16} color={COLORS.accent} /></View>
               <Text style={styles.stepText}>
@@ -115,6 +133,12 @@ const styles = StyleSheet.create({
   settledBox: { width: 252, height: 252, alignItems: 'center', justifyContent: 'center', gap: 10 },
   settledText: { fontSize: 16, fontWeight: '700', color: '#07070F' },
 
+  shareRow: { flexDirection: 'row', gap: 10, width: '100%', marginBottom: SPACING.lg },
+  shareBtn: {
+    flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
+    paddingVertical: 12, borderRadius: RADIUS.md, borderWidth: 1, borderColor: 'rgba(62,217,184,0.4)', backgroundColor: COLORS.accentSoft,
+  },
+  shareText: { color: COLORS.accent, fontWeight: '700', fontSize: 14 },
   stepRow: { flexDirection: 'row', gap: 12, alignItems: 'flex-start', width: '100%', marginBottom: SPACING.md },
   stepIcon: {
     width: 30, height: 30, borderRadius: 10, backgroundColor: COLORS.accentSoft,
