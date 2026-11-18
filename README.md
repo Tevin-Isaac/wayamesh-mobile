@@ -1,115 +1,196 @@
 # Wayamesh
 
-**Offline-first P2P USDC payments on [Arc](https://arc.network).** Sign a payment with no internet, hand it to the receiver by **QR code or Bluetooth**, and it settles on Arc in under a second from whichever phone finds a connection first. Money that moves like cash, settles like a blockchain.
-
-Built for the **Build on Arc** hackathon.
-
-## 📲 Try the beta (Android)
+**Pay in USDC, even offline.** Wayamesh is a self-custody wallet that signs payments with no internet, hands them over by QR (or Bluetooth on Android), and settles them on [Arc](https://arc.network) when any phone gets a connection.
 
 | | |
 |---|---|
-| **Download APK** | [wayamesh-beta.apk — always the latest build](https://github.com/Tevin-Isaac/wayamesh-mobile/releases/latest/download/wayamesh-beta.apk) |
-| **All releases** | [Release notes & previous versions](https://github.com/Tevin-Isaac/wayamesh-mobile/releases) |
+| **Website** | [wayamesh.xyz](https://wayamesh.xyz) |
+| **Web wallet — try it now, nothing to install** | [wayamesh.xyz/app](https://wayamesh.xyz/app) |
+| **Android beta (APK)** | [wayamesh-beta.apk — latest](https://github.com/Tevin-Isaac/wayamesh-mobile/releases/latest/download/wayamesh-beta.apk) · [all releases](https://github.com/Tevin-Isaac/wayamesh-mobile/releases) |
+| **Website source** | [Tevin-Isaac/wayamesh](https://github.com/Tevin-Isaac/wayamesh) |
 
-> Current: **v1.0.0-beta.2 — Offline Handoff**. Runs on **Arc Testnet** — get free test USDC at [faucet.circle.com](https://faucet.circle.com) (select Arc Testnet). iOS TestFlight coming soon.
+> **Testnet only.** Wayamesh runs on **Arc Testnet** with test USDC. Arc mainnet is not live, so nothing here holds real money. Get free test USDC at [faucet.circle.com](https://faucet.circle.com) (choose *Arc Testnet*).
 
-**Quick test flow:** create a wallet → grab faucet USDC → send to a friend → open chat and pay in-thread → sign a payment in airplane mode and hand it over via QR.
+## Try it in two minutes (web or phone — same flow)
 
-## Why
+The web wallet and the Android app follow the same screens and the same payment format, and the same seed phrase gives the same address on both.
 
-Over half of Sub-Saharan Africa is unbanked, and connectivity is intermittent. Mobile money proved demand; Wayamesh removes the two remaining walls — **connectivity** and **currency volatility** — with offline-signed USDC transfers that settle in under a second on Arc.
+1. **Create a wallet** — open [wayamesh.xyz/app](https://wayamesh.xyz/app) (or the app), choose *Create wallet*, set a PIN, and write down the seed phrase.
+2. **Get test USDC** — copy your address from the Wallet screen and request USDC for *Arc Testnet* at [faucet.circle.com](https://faucet.circle.com).
+3. **Fund your offline reserve** — *Offline reserve → Add to reserve*. (Two on-chain steps: approve, then deposit. Gas is paid in USDC.)
+4. **Send** — *Send*, enter a recipient address and an amount. The button reads *Sign offline voucher*. You can switch on airplane mode first; signing needs no connection.
+5. **Hand it over** — a QR code appears. The receiver opens *Scan* and points a camera at it, sees *Funded by payer*, and taps *Accept*. (No camera? *Send as text* / *Copy as text*, and the receiver uses *Paste code*.)
+6. **Settle** — whoever has a connection taps *Settle*. The USDC moves on Arc and the settler keeps the small courier fee.
 
-## How an offline payment moves
+You can test the whole thing with two browser profiles, or a browser and a phone.
 
-1. **Sign** — the sender's phone signs a USDC transfer with its hardware-bound key. No connection needed. The signed transaction is sealed: amount, recipient, and sender cannot be altered by anyone.
-2. **Hand off** — the payment travels to the receiver's phone as a **QR code** (camera scan) or over **Bluetooth** (native BLE handoff, no infrastructure). The receiver now *holds* the settlement-ready transaction — they no longer depend on the sender reconnecting.
-3. **Settle** — whichever phone touches the internet first broadcasts it. Arc finality ≈ 480 ms. Once settled it is irreversible — no chargebacks, no cancellation.
+## How it works
 
-Any phone can also act as a **courier**: carry a third party's payment to the internet and settle it for them. That's the seed of the mesh.
+### The money model
 
-## Features
+Wayamesh uses the **MeshPayV2** contract on Arc Testnet (`0xd619b77bb8389a632800c300969ef152099f7691`, verified live: 24-hour withdrawal delay).
 
-- **Self-custody wallet** — keys generated on-device, stored hardware-bound (Android Keystore / iOS Secure Enclave), biometric-gated. Never leaves the phone.
-- **Offline send + handoff** — sign with no connection; settle-on-reconnect from either side of the trade (QR or BLE handoff), with automatic dedup when multiple phones hold the same payment.
-- **Chat + pay** — message contacts and send USDC inside the thread; incoming payments appear as bubbles automatically.
-- **Incoming payment detection** — background sync spots transfers to your address (ERC-20 logs + balance-delta for logless native sends).
-- **Agent wallet (beta)** — a spending envelope the AI/automation can never exceed: per-tx / daily / total caps, allowlists, expiry — enforced on-device by a deterministic policy engine with a full audit log. **Standing payments execute fully offline**: due payments pass the mandate gate, sign locally, and settle at reconnect.
-- **Gasless smart account (beta)** — Circle Smart Account + Circle Paymaster: pay gas in USDC itself.
-- **Recovery, three ways** — seed phrase, PIN-protected cloud backup, and Shamir guardian shards.
-- **Add money / cash out** — M-Pesa via the `server/` Daraja backend (mock/sandbox/production modes) plus an optional hosted card/bank provider; faucet fallback on testnet.
-- **USSD companion** (prototype in [`ussd-service/`](ussd-service/)) — feature-phone access via `*XXX#` menus.
+- **Offline reserve.** You pre-load USDC into the contract under your address. That balance backs your offline payments.
+- **Voucher.** An offline payment is an EIP-712 signed authorization: *pay X USDC (+ a courier fee) to address Y, valid until time T, nonce N*. Signing happens on your device and needs no network.
+- **Funded check.** Because your reserve is on-chain, anyone you pay can check *Funded by payer* before accepting — whenever they have any connection.
+- **Settlement.** Any phone or browser can submit a voucher to the contract. The contract checks the signature, deadline, nonce and reserve, pays the recipient, and pays the courier fee to whoever submitted it. Duplicates are rejected by per-payer nonces.
+- **Courier fee.** 0.01 USDC by default (the web wallet lets you change it), paid from your reserve to whoever settles. This is what pays phones to carry and settle other people's payments.
+- **Validity.** Vouchers live 24 hours, never longer than the 24-hour withdrawal delay, so a payer cannot sign, hand over, and then drain the reserve before it settles. Receivers refuse vouchers that live longer, or are about to expire.
+- **Receiver risk limit.** A receiver holds at most **$100** of unsettled offline value from any one payer.
+- **Withdrawing.** *Request withdrawal*, wait the 24-hour delay (your reserve stays spendable meanwhile), then *Finalize*.
+- **No reserve?** If your reserve doesn't cover the amount, the phone falls back to a plain signed USDC transfer from your wallet balance, so sending always works.
 
-## What's new in this update
+**What the guarantee is — and isn't.** Until a voucher settles it is a promise backed by the payer's reserve. A malicious payer could sign conflicting vouchers to different receivers; the first to settle wins. That is why receivers cap their exposure per payer. Locked collateral with fraud proofs is on the roadmap. Do not treat an unsettled payment as final money.
 
-- **Provable offline payments (MeshPayV2).** Pre-fund an on-chain *offline reserve*; offline payments are EIP-712 vouchers drawn from it, so a receiver can check "Funded" before accepting. Any phone can settle a voucher and keeps its small courier fee (0.01 USDC). Receiver risk limit: max $100 unsettled per payer. Contract on Arc Testnet: `0xd619b77bb8389a632800c300969ef152099f7691` (24h withdrawal delay). With no reserve, sending falls back to a plain signed transfer.
-- **M-Pesa on/off-ramp.** [`server/`](server/README.md) is a small Daraja backend (STK Push in, B2C out) with a mock mode for demos. The app's Add money / Cash out screen talks to it via `EXPO_PUBLIC_RAMP_API_URL`. Testnet demo rate only; real money needs Arc mainnet, Safaricom go-live and legal review.
-- **Web app** ([`web/`](web/README.md)). The website is now a working wallet that follows the phone's flow: onboarding, PIN, backup, wallet, send/receive, chats, history, mesh (QR handoff — browsers have no Bluetooth), agent mandates, reserve, ramp, settings. Phone and web share the `mp2:` voucher format and the same seed gives the same address.
+### Handing a payment over
 
-Not covered by tests yet: funded end-to-end deposit/settle/withdraw (needs a funded wallet on a real device), and the ramp against live Safaricom.
+The QR code **is** the signed payment (`mp2:` + 178 bytes, base64url). Nothing else is needed.
+
+| Situation | How it travels |
+|---|---|
+| Same place, both offline | QR scan (any device) or Bluetooth (Android) |
+| Sender offline, receiver online | Share/copy the payment as text over any channel; the receiver pastes it into *Scan* |
+| Both online | Pay directly; no handoff needed |
+
+### Chat
+
+End-to-end encrypted messaging with contacts, plus payments inside the thread.
+
+- **Contacts.** Save a name, wallet address and an optional phone note (a label only; never used for lookup). You can pay any saved address immediately. To chat, exchange a **contact card** (QR or text) — it is signed by the wallet, so it cannot be forged.
+- **Encryption.** Each message is sealed to the recipient's chat key (secp256k1 ECDH + XChaCha20-Poly1305). The chat key is derived separately from your wallet key and is never used to sign payments.
+- **Transport.** Messages travel through free **public Nostr relays**, which are untrusted mailboxes — they see only sealed bytes under throwaway keys. There is no server of ours, so chat costs nothing to run.
+- **24-hour expiry.** Messages disappear after 24 hours: the expiry is signed into the message, set as a relay expiration tag, and enforced by local purges. Contacts and payment history are never purged.
+- **Pay in chat.** Paying from a thread sends the payment as a message with an **Accept** button, the same as scanning.
+- **Limits.** Text only, 1000 characters. A message to someone offline is delivered when they come online; relays only hold it briefly. The phone receives messages while the app is open (no push notifications yet).
+- **Bluetooth chat (Android) is experimental** — see below.
+
+Details: [docs/chat.md](docs/chat.md).
+
+### Bluetooth (Android) — optional
+
+Bluetooth hand-off and nearby chat are **Android-only, single-hop, and optional**. Everything works without Bluetooth (iOS, Expo Go, browsers, Bluetooth off, permission denied): use QR, *Send as text*, or online sends.
+
+- Open the **Mesh** tab: your phone becomes discoverable and can hand queued payments to nearby phones (*Find nearby phones*).
+- A small native Kotlin module advertises a GATT service and reassembles chunked frames from a nearby phone.
+- **Status:** the frame path was fixed in this release (the receiver rejected every write before) and is covered by a simulation, but **Bluetooth hand-off and Bluetooth chat have not yet been tested on two physical devices**.
+
+### M-Pesa add money / cash out
+
+[`server/`](server/README.md) is a small Daraja backend (STK Push in, B2C out). The app's *Add money / Cash out* screen talks to it via `EXPO_PUBLIC_RAMP_API_URL`; the web wallet via `VITE_RAMP_API_URL`.
+
+- Requests are authorised by a wallet signature (5-minute window, single use), payouts are idempotent, and a failed payout refunds automatically.
+- It has a **mock mode** that simulates Safaricom, so the full flow demos with no credentials.
+- **Testnet demo only.** On Arc Testnet, USDC has no value, so rates are a fixed demo rate and amounts are capped. Going live needs Arc mainnet, Safaricom approval for the shortcode, B2C initiator credentials, and legal/licensing review.
+- Verified: unit tests (17) and a mock-mode end-to-end on-ramp. **Not yet verified:** real Safaricom calls, B2C payouts, or off-ramp against the live chain.
+
+### Agent wallet (phone)
+
+A spending envelope that automation can never exceed: per-transaction, daily and total caps, recipient allowlist and expiry, enforced on-device by a deterministic policy engine with an audit log. Standing payments run offline. An optional "Ask your wallet" chat uses Claude to *propose* payments; the policy engine decides. See [AGENT.md](AGENT.md). *(Note: the demo build reads its API key from an `EXPO_PUBLIC_` variable, which is extractable from the APK — it must move behind a backend before any real release.)* The web wallet has mandates and the policy engine but shows "Ask your wallet" as needing a backend proxy.
+
+### Recovery and security
+
+- Keys are generated on the device. On the phone they are stored in the OS keystore, gated by biometrics.
+- On the web, the key is encrypted with your PIN (PBKDF2 600,000 rounds + AES-GCM). **The PIN is a convenience lock** — the seed phrase is the real recovery; keep it safe.
+- Recovery on the phone: seed phrase, PIN-protected encrypted backup, or Shamir guardian shards (guardian recovery and the smart account are phone-only).
+- 12-word seeds (web) and 24-word seeds (phone) both import on either side; one seed gives one address.
+
+## Phone vs web
+
+| | Android app | Web wallet |
+|---|---|---|
+| Create / import / restore wallet, PIN, backup | ✅ | ✅ |
+| Offline reserve, offline-signed vouchers, QR hand-off, settle | ✅ | ✅ |
+| Send as text / paste a payment | ✅ | ✅ |
+| Contacts + encrypted chat + pay in chat | ✅ | ✅ |
+| M-Pesa add money / cash out (needs `server/`) | ✅ | ✅ |
+| Agent mandates | ✅ | ✅ |
+| Bluetooth hand-off and mesh | ✅ Android, experimental | ❌ browsers can't |
+| Biometric unlock | ✅ | PIN + auto-lock |
+| Guardian recovery, gasless smart account | ✅ beta | ❌ |
+| "Ask your wallet" (Claude) | ✅ demo | needs backend |
+| Install | APK (beta) | none — [wayamesh.xyz/app](https://wayamesh.xyz/app) |
 
 ## Built on Arc
 
 | | |
 |---|---|
 | Network | Arc Testnet — chain ID `5042002` |
-| RPC | `https://rpc.testnet.arc.network` (+ automatic failover) |
-| Gas | **USDC is the native gas token** (18 dp native / 6 dp display) |
+| RPC | `https://rpc.testnet.arc.network` (+ failover) |
+| Gas | USDC is the native gas token (18 dp native / 6 dp as ERC-20) |
 | USDC ERC-20 facade | `0x3600000000000000000000000000000000000000` |
+| MeshPayV2 | `0xd619b77bb8389a632800c300969ef152099f7691` |
 | Circle Paymaster (v0.7) | `0x31BE08D380A21fc740883c0BC434FcFc88740b58` |
 | Explorer | [testnet.arcscan.app](https://testnet.arcscan.app) |
 
-**Arc surface used today:** JSON-RPC (transfers, logs, receipts), native-USDC gas, 20 gwei fee floor (signed at 40 gwei for offline safety), Circle Paymaster + ERC-4337 smart accounts, Circle faucet.
-**On the roadmap:** CCTP / Bridge Kit (top up Arc from other chains), Circle Gateway (unified cross-chain USDC balance), escrow contract for provable offline-spend guarantees (+ watchtower service).
+## What has and hasn't been verified
 
-## Stack
+**Verified by running it**
+- A voucher signed on the web wallet was settled on Arc Testnet and the recipient's balance rose by exactly the amount (first funded end-to-end test).
+- Mobile- and web-signed vouchers validate against the live contract (valid signature, wrong signer and expired all return the correct codes), and the mobile codec decodes with the web decoder.
+- Web wallet: typecheck, 45 tests, production build, and headless-browser checks of onboarding, chat screens and the live site.
+- Chat: seal/open, tamper and forgery rejection, signed expiry, purge keeping contacts and payments, and a live message round trip through two public relays.
+- Ramp server: 17 tests and a mock-mode on-ramp.
 
-Expo (React Native, SDK 54) · TypeScript · ethers v6 · viem + Circle Modular Wallets (smart accounts) · SQLite · expo-secure-store + local authentication · react-native-ble-plx (central) + custom native Kotlin BLE peripheral module
-
-No backend. The phone talks directly to Arc — there is no server between users and their money.
+**Not yet verified**
+- Bluetooth hand-off, Bluetooth chat and mesh detection on real devices.
+- The phone's new chat screens, share/paste buttons and reserve screen on a device (typechecked and bundled only).
+- Real M-Pesa (Safaricom) calls and cash-out.
+- Background message delivery on the phone.
 
 ## Run it locally
 
 ```bash
+# Phone app (full app needs a dev build; Expo Go works for everything except Bluetooth)
 npm install
-npx expo start          # dev server — full app needs a dev build; Expo Go works for everything except Bluetooth
-```
+npx expo start
+npx tsc --noEmit                       # typecheck
 
-```bash
 # Android build via EAS
 npx eas-cli build --platform android --profile preview
+
+# Web wallet
+cd web && npm install && npm run dev   # http://localhost:5173/app
+npm test && npm run build
+
+# M-Pesa ramp backend (mock mode needs no credentials)
+cd server && npm install && npm run dev
+npm test
 ```
 
-No environment variables are required for testnet. Optional:
-
-- `EXPO_PUBLIC_RAMP_API_URL` — URL of the `server/` ramp backend (enables M-Pesa add money / cash out)
-- `EXPO_PUBLIC_RAMP_PROVIDER` / `EXPO_PUBLIC_RAMP_API_KEY` — optional hosted card/bank provider (mainnet only)
+Environment variables (all optional on testnet):
+- `EXPO_PUBLIC_RAMP_API_URL` / `VITE_RAMP_API_URL` — URL of the `server/` ramp backend.
+- `EXPO_PUBLIC_RAMP_PROVIDER` / `EXPO_PUBLIC_RAMP_API_KEY` — optional hosted card/bank provider (mainnet only).
+- See [`server/.env.example`](server/.env.example) for the backend. **Never commit `.env` files.**
 
 ## Project structure
 
 ```
-app/                 expo-router screens (wallet, send, chat, mesh, agent, handoff…)
-src/wallet/          keystore, signing, sync, settlement, smart account
-src/mesh/            payment envelopes, ingest, BLE central + peripheral transports
-src/agent/           spending-mandate policy engine, standing payments, offline executor
-src/db/              SQLite (transactions, contacts, chat)
+app/                   expo-router screens (wallet, send, receive, reserve, chat, mesh, agent, ramp…)
+src/wallet/            keystore, signing, MeshPayV2 reserve + settlement, sync
+src/mesh/              voucher codec, envelopes, ingest, BLE central + peripheral transports
+src/chat/              E2E encrypted chat: crypto, relay pool, identity, service
+src/agent/             spending-mandate policy engine, standing payments, offline executor
+src/ramp/              ramp server client
+src/db/                SQLite (transactions, contacts, chat, reserve cache)
 modules/wayamesh-ble/  native Kotlin BLE peripheral (advertise + GATT server)
-docs/                landing page + pitch deck (GitHub Pages)
-ussd-service/        standalone USSD backend prototype
+web/                   the web wallet (Vite + React) — built into wayamesh.xyz/app
+server/                M-Pesa (Daraja) ramp backend
+ussd-service/          standalone USSD backend prototype
+docs/                  chat design, pitch deck
 ```
+
+The website ([Tevin-Isaac/wayamesh](https://github.com/Tevin-Isaac/wayamesh)) is a Next.js site that mounts the built web wallet at `/app`. Update it with `web/scripts/sync-to-website.sh "<path to the website repo>"`.
+
+## Roadmap
+
+Real-device Bluetooth testing and multi-hop relay, iOS peripheral, push notifications, locked-collateral receiver guarantees with fraud proofs, a gasless relayer, Arc mainnet, independent contract audit, and licensed fiat rails.
 
 ## Docs
 
+- [Chat design and limits](docs/chat.md)
 - [Smart accounts & gasless USDC](SMART_ACCOUNTS.md)
 - [Agent wallet & mandates](AGENT.md)
-- [USSD service](ussd-service/README.md)
-
-## Known limitations (beta)
-
-- **Chat text is device-local** — payments transmit between devices (on-chain + handoff); text messages don't leave your phone until the mesh relay carries them (next milestone).
-- **BLE handoff is single-hop and Android-only** for now (iOS peripheral + multi-hop relay are roadmap); QR handoff works on any two devices today.
-- **Offline receiver guarantee is settlement-based** — until a payment settles, treat it like a promise from a customer; the on-chain escrow envelope (locked collateral + fraud proofs) is the roadmap answer for both-offline guarantees.
-- Testnet USDC only (Arc mainnet is not yet live).
-- UI is English-first; translations exist but aren't wired into all screens yet.
+- [Web wallet](web/README.md) · [M-Pesa ramp server](server/README.md) · [USSD service](ussd-service/README.md)
 
 ## License
 
