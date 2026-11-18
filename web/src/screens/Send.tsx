@@ -133,7 +133,7 @@ export function Confirm() {
   const amount = useMemo(() => { try { return parseUsdc(amountStr) } catch { return 0n } }, [amountStr])
 
   const [offline, setOffline] = useState<boolean | null>(null)
-  const [tip, setTip] = useState('')
+  const [tip, setTip] = useState('0.01')
   const [fee, setFee] = useState<string | null | undefined>(undefined)
   const [step, setStep] = useState<Step>('review')
   const [err, setErr] = useState('')
@@ -242,7 +242,7 @@ export function Confirm() {
         </Card>
 
         {mode && (
-          <Field label="Courier tip (optional, USDC)" inputMode="decimal" value={tip} onChange={(e: any) => setTip(e.target.value)} placeholder="0" error={tipUnits < 0n} hint={tipUnits < 0n ? 'Enter a USDC amount' : 'Paid from your reserve to whoever settles the payment.'} />
+          <Field label="Courier tip (optional, USDC)" inputMode="decimal" value={tip} onChange={(e: any) => setTip(e.target.value)} placeholder="0.01" error={tipUnits < 0n} hint={tipUnits < 0n ? 'Enter a USDC amount' : 'Paid from your reserve to whoever settles the payment.'} />
         )}
 
         <div className="detail">

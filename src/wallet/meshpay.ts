@@ -254,7 +254,7 @@ export async function findSettledTx(v: Voucher): Promise<string | null> {
       const latest = await p.getBlockNumber();
       const logs = await mp.queryFilter(
         mp.filters.Settled(v.payment.from, null, v.payment.ref),
-        Math.max(0, latest - 100_000),
+        Math.max(0, latest - 9_000),
         latest,
       );
       return logs.length ? logs[0].transactionHash : null;
