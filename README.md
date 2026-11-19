@@ -44,7 +44,7 @@ Wayamesh uses the **MeshPayV2** contract on Arc Testnet (`0xd619b77bb8389a632800
 
 ### Handing a payment over
 
-The QR code **is** the signed payment (`mp2:` + 178 bytes, base64url). Nothing else is needed.
+The signed payment (`mp2:` + 178 bytes, base64url) is all the receiver needs, and it is the same data whichever way it travels: as a **QR code** on any device, or over **Bluetooth** on Android (beta, not yet tested on real devices). Anyone can deliver it to the network and nobody can change it.
 
 | Situation | How it travels |
 |---|---|
