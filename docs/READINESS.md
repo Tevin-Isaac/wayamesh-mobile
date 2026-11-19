@@ -22,14 +22,14 @@ Legend: ✅ done and checked · 🟡 partly done or not checked on real devices 
 |---|---|---|
 | Core payment flow (reserve, offline voucher, QR hand-off, settle, fee) | ✅ on-chain | Proven with a funded run; web UI path proven by a funded manual test |
 | Contract | 🟡 | Verified source and tests, **no independent audit** |
-| Web wallet | ✅ | Live, hardened (33 hostile-input checks), light/dark in progress |
+| Web wallet | ✅ | Live, hardened (33 hostile-input checks). Light mode with a toggle is being added |
 | Android app | 🟡 | Built and released; **never installed or run on a physical device in this review** |
 | Bluetooth hand-off and nearby chat | 🟡 | Native receiver bug found and fixed; covered by simulation only. Needs two Android phones |
 | iOS app | ❌ | Configured only; no build, no TestFlight |
 | Chat | 🟡 | Protocol, expiry, cross-compat tested; relays are public and not guaranteed; no push notifications |
 | M-Pesa on/off-ramp | 🟡 | Mock mode end to end; server tested (28); **not hosted, never called against real Safaricom**; cash-out not exercised |
-| Website | ✅ | Live, honest copy, photography, socials; theme toggle and legal pages in progress |
-| Legal pages (privacy, terms) | ❌ → in progress | Drafts being added; need legal review |
+| Website | ✅ | Live: honest copy, distinct licensed photography, socials, light/dark toggle in the navbar, compact product section with a real QR example, SEO basics (robots, sitemap, share card), accessibility pass |
+| Legal pages (privacy, terms) | 🟡 | Live at /privacy and /terms as clearly marked drafts, written from what the product really does; **need legal review** and a jurisdiction before launch |
 | Contact | 🟡 | Site shows a personal Gmail address. `hello@wayamesh.xyz` has no mailbox (no MX record). Set up a domain mailbox before launch |
 | Demo video | ❌ | None yet. See the script below |
 | App store listing | ❌ | APK sideload only; no Play Console or App Store presence |
@@ -44,7 +44,7 @@ Legend: ✅ done and checked · 🟡 partly done or not checked on real devices 
 **Before submitting a grant application (days)**
 1. Record the real-device demo (two phones; script below) and host it (YouTube unlisted or the repo release).
 2. Install the APK on a real phone and run the whole test checklist; fix what breaks. Do the Bluetooth test on two Android phones.
-3. Publish privacy and terms pages (drafts in progress) and replace the personal email with a domain mailbox.
+3. Have the privacy and terms drafts (already live) reviewed by a lawyer, and replace the personal email with a domain mailbox.
 4. Rotate the Anthropic key and remove it from the preview build (or proxy it).
 5. Fill the grant form from section 5, linking only evidence in section 1.
 
