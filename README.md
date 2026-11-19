@@ -190,6 +190,7 @@ Real-device Bluetooth testing and multi-hop relay, iOS peripheral, push notifica
 ## Docs
 
 - [Security: what is protected, what is not](SECURITY.md)
+- [Grant and market readiness review](docs/READINESS.md)
 - [Feature parity with the web wallet](docs/PARITY.md) · [Release notes](docs/RELEASE-NOTES.md) · [iOS build](docs/IOS.md)
 - [Chat design and limits](docs/chat.md)
 - [Smart accounts & gasless USDC](SMART_ACCOUNTS.md)
