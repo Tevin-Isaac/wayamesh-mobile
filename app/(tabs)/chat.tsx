@@ -1,10 +1,10 @@
 import { useState, useCallback } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Avatar } from '@/components/pro';
-import { getConversations, countRequests, type Conversation } from '@/db/chat';
+import { getConversations, countRequests, deleteContact, type Conversation } from '@/db/chat';
 import { onChatChange, pool, startChat, useRelayStatus } from '@/chat/service';
 import { unlockChat, useChatUnlocked } from '@/chat/identity';
 import { COLORS, SPACING, RADIUS } from '@/constants/theme';
@@ -67,6 +67,7 @@ export default function ChatScreen() {
           : 'Not connected. Messages will be sent when you are back online.'}
       </Text>
 
+      {convos.length > 0 && <Text style={styles.net}>Saved contacts stay until you delete them. Press and hold one to delete it.</Text>}
       <ScrollView contentContainerStyle={styles.scroll}>
         {convos.length === 0 ? (
           <View style={styles.empty}>
@@ -84,6 +85,14 @@ export default function ChatScreen() {
               style={styles.row}
               activeOpacity={0.7}
               onPress={() => router.push({ pathname: '/chat-thread', params: { peer: c.address, name: c.name } })}
+              onLongPress={() => Alert.alert(
+                c.name || 'Contact',
+                'Delete this contact? Their messages are removed too. Payments stay in your history.',
+                [
+                  { text: 'Cancel', style: 'cancel' },
+                  { text: 'Delete contact', style: 'destructive', onPress: () => { deleteContact(c.address); refresh(); } },
+                ],
+              )}
             >
               <Avatar seed={c.name || c.address} size={48} />
               <View style={styles.rowBody}>

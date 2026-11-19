@@ -10,7 +10,7 @@ import { ethers } from 'ethers';
 import { useWallet } from '@/hooks/useWallet';
 import { sendPayment, planPayment, type PayMode } from '@/wallet/pay';
 import { Avatar } from '@/components/pro';
-import { getContacts, getContact, type Contact } from '@/db/chat';
+import { getContacts, getContact, addContact, type Contact } from '@/db/chat';
 import { COLORS, SPACING, RADIUS, FONTS } from '@/constants/theme';
 import { groupAddress, lookalike, safeDecimal, unsafeRecipient } from '@/utils/safety';
 import { VOUCHER_TTL_SECONDS } from '@/mesh/voucher';
@@ -241,6 +241,12 @@ function SendAnimation({ phase, amount, to, txHash, mode, onDone }: { phase: Pha
   }, [phase]);
 
   const shortTo = `${to.slice(0, 6)}…${to.slice(-4)}`;
+  // Offer to keep anyone you paid by scanning or pasting an address: saved contacts stay until you delete them.
+  const [saved, setSaved] = useState(() => { try { return !!getContact(to); } catch { return true; } });
+  const [saveName, setSaveName] = useState('');
+  function saveContact() {
+    try { addContact(to, saveName.trim() || shortTo); setSaved(true); } catch { /* contact limit reached: ignore */ }
+  }
 
   if (phase === 'done') {
     return (
@@ -261,6 +267,20 @@ function SendAnimation({ phase, amount, to, txHash, mode, onDone }: { phase: Pha
               : 'Settles on Arc the moment you reconnect. Hand it over by QR to let the receiver settle it first.'}
           </Text>
         </View>
+        {saved ? null : (
+          <View style={styles.saveBox}>
+            <Text style={styles.saveTitle}>Save {shortTo} as a contact?</Text>
+            <View style={styles.saveRow}>
+              <TextInput
+                style={styles.saveInput} value={saveName} onChangeText={setSaveName} maxLength={24}
+                placeholder="Name" placeholderTextColor={COLORS.textDim}
+              />
+              <TouchableOpacity style={styles.saveBtn} onPress={saveContact} activeOpacity={0.85}>
+                <Text style={styles.saveBtnText}>Save</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        )}
         {!!txHash && (
           <TouchableOpacity
             style={styles.handoffBtn}
@@ -389,5 +409,11 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.accentSoft, borderWidth: 1, borderColor: 'rgba(62,217,184,0.3)',
   },
   relayPillText: { fontSize: 13, color: COLORS.accent, fontWeight: '600' },
+  saveBox: { marginBottom: SPACING.md, padding: SPACING.md, borderRadius: RADIUS.md, backgroundColor: COLORS.surface, borderWidth: 1, borderColor: COLORS.border, gap: 10 },
+  saveTitle: { fontSize: 13.5, color: COLORS.text, fontWeight: '600' },
+  saveRow: { flexDirection: 'row', gap: 10 },
+  saveInput: { flex: 1, backgroundColor: COLORS.bg, borderWidth: 1, borderColor: COLORS.border, borderRadius: RADIUS.md, paddingHorizontal: 12, paddingVertical: 10, color: COLORS.text, fontSize: 15 },
+  saveBtn: { backgroundColor: COLORS.accent, borderRadius: RADIUS.md, paddingHorizontal: 20, alignItems: 'center', justifyContent: 'center' },
+  saveBtnText: { color: COLORS.bg, fontWeight: '700', fontSize: 14 },
   successNote: { fontSize: 13, color: COLORS.textDim, marginTop: SPACING.md, textAlign: 'center', maxWidth: 260, lineHeight: 20 },
 });

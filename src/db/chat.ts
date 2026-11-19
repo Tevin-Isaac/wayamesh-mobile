@@ -215,6 +215,18 @@ export function clearConversation(address: string): void {
   getDb().runSync('DELETE FROM chat_messages WHERE peer = ?', [address.toLowerCase()]);
 }
 
+/**
+ * Removes a saved contact and the messages exchanged with them. Unlike blocking, they can be added again later and
+ * can still message you (as a request). Payments and settlement history are separate and are never touched.
+ */
+export function deleteContact(address: string): void {
+  ensureTables();
+  const a = address.toLowerCase();
+  const db = getDb();
+  db.runSync('DELETE FROM chat_messages WHERE peer = ?', [a]);
+  db.runSync('DELETE FROM contacts WHERE address = ?', [a]);
+}
+
 export function getRequests(): Contact[] {
   ensureTables();
   return getDb().getAllSync<Contact>('SELECT * FROM contacts WHERE request = 1 AND blocked = 0 ORDER BY created_at DESC');

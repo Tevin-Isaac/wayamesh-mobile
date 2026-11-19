@@ -9,7 +9,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useWallet } from '@/hooks/useWallet';
 import { sendPayment as pay, planPayment } from '@/wallet/pay';
 import { Avatar } from '@/components/pro';
-import { getMessages, addMessage, getContact, acceptRequest, blockContact, clearConversation, setVerified, getInvoice, type ChatMessage, type Contact } from '@/db/chat';
+import { getMessages, addMessage, getContact, acceptRequest, blockContact, clearConversation, deleteContact, setVerified, getInvoice, type ChatMessage, type Contact } from '@/db/chat';
 import {
   onChatChange, paymentView, purgeNow, sendPaymentMessage, sendRequest, sendText as sendChatText, trySendNearby, useRelayStatus,
 } from '@/chat/service';
@@ -124,6 +124,17 @@ export default function ChatThreadScreen() {
     Alert.alert(name, undefined, [
       { text: 'Safety number', onPress: showSafety },
       { text: 'Clear conversation', onPress: () => { clearConversation(peer); refresh(); } },
+      {
+        text: 'Delete contact', style: 'destructive',
+        onPress: () => Alert.alert(
+          `Delete ${name}?`,
+          'This removes them from your contacts and deletes your messages with them. Payments stay in your history. You can add them again any time.',
+          [
+            { text: 'Cancel', style: 'cancel' },
+            { text: 'Delete', style: 'destructive', onPress: () => { deleteContact(peer); router.back(); } },
+          ],
+        ),
+      },
       { text: 'Block', style: 'destructive', onPress: () => { blockContact(peer); router.back(); } },
       { text: 'Cancel', style: 'cancel' },
     ]);
