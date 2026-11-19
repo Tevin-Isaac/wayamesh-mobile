@@ -56,8 +56,8 @@ The QR code **is** the signed payment (`mp2:` + 178 bytes, base64url). Nothing e
 
 End-to-end encrypted messaging with contacts, plus payments inside the thread.
 
-- **Contacts.** Save a name, wallet address and an optional phone note (a label only; never used for lookup). You can pay any saved address immediately. To chat, exchange a **contact card** (QR or text) — it is signed by the wallet, so it cannot be forged.
-- **Encryption.** Each message is sealed to the recipient's chat key (secp256k1 ECDH + XChaCha20-Poly1305). The chat key is derived separately from your wallet key and is never used to sign payments.
+- **Contacts.** Save a name, wallet address and an optional phone note (a label only; never used for lookup). You can pay any saved address immediately. To chat, exchange a **contact card** (QR or text). A card carries the address and chat public key; compare the **safety number** with your contact to be sure it is really them. Unknown senders land in a *message requests* inbox until you accept them (or block them).
+- **Encryption.** Each message is sealed to the recipient's key (secp256k1 ECDH + XChaCha20-Poly1305) and signed by the sender's wallet key, following the shared spec in [`meshpay-arc/docs/PORTING-TO-WAYAMESH-MOBILE.md`](https://github.com/Tevin-Isaac/meshpay-arc/blob/master/docs/PORTING-TO-WAYAMESH-MOBILE.md). The phone and the web wallet open each other's messages (proven by cross tests and the published test vectors). Because the wallet key is biometric-locked, the app asks for one biometric check per session when you open Chats or pay in a thread, and keeps the key in memory only until the app goes to the background.
 - **Transport.** Messages travel through free **public Nostr relays**, which are untrusted mailboxes — they see only sealed bytes under throwaway keys. There is no server of ours, so chat costs nothing to run.
 - **24-hour expiry.** Messages disappear after 24 hours: the expiry is signed into the message, set as a relay expiration tag, and enforced by local purges. Contacts and payment history are never purged.
 - **Pay in chat.** Paying from a thread sends the payment as a message with an **Accept** button, the same as scanning.
@@ -108,7 +108,7 @@ A spending envelope that automation can never exceed: per-transaction, daily and
 | Biometric unlock | ✅ | PIN + auto-lock |
 | Guardian recovery, gasless smart account | ✅ beta | ❌ |
 | "Ask your wallet" (Claude) | ✅ demo | needs backend |
-| Install | APK (beta) | none — [wayamesh.xyz/app](https://wayamesh.xyz/app) |
+| Install | APK (beta). iOS build configured via EAS, untested on devices ([docs/IOS.md](docs/IOS.md)) | none — [wayamesh.xyz/app](https://wayamesh.xyz/app) |
 
 ## Built on Arc
 
@@ -127,7 +127,8 @@ A spending envelope that automation can never exceed: per-transaction, daily and
 **Verified by running it**
 - A voucher signed on the web wallet was settled on Arc Testnet and the recipient's balance rose by exactly the amount (first funded end-to-end test).
 - Mobile- and web-signed vouchers validate against the live contract (valid signature, wrong signer and expired all return the correct codes), and the mobile codec decodes with the web decoder.
-- Web wallet: typecheck, 45 tests, production build, and headless-browser checks of onboarding, chat screens and the live site.
+- Phone app: typecheck, 56 tests (chat protocol cross-compatibility with the Arc Studio web wallet, all published test vectors, 33 hostile-input checks plus phone-specific ones), and the Android and iOS JavaScript bundles build. A funded end-to-end run on Arc Testnet: deposit, sign offline with the phone's code, check, settle by a third party, courier fee paid, replay rejected.
+- Web wallet: see [meshpay-arc](https://github.com/Tevin-Isaac/meshpay-arc) for its checks.
 - Chat: seal/open, tamper and forgery rejection, signed expiry, purge keeping contacts and payments, and a live message round trip through two public relays.
 - Ramp server: 17 tests and a mock-mode on-ramp.
 
@@ -187,6 +188,8 @@ Real-device Bluetooth testing and multi-hop relay, iOS peripheral, push notifica
 
 ## Docs
 
+- [Security: what is protected, what is not](SECURITY.md)
+- [Feature parity with the web wallet](docs/PARITY.md) · [Release notes](docs/RELEASE-NOTES.md) · [iOS build](docs/IOS.md)
 - [Chat design and limits](docs/chat.md)
 - [Smart accounts & gasless USDC](SMART_ACCOUNTS.md)
 - [Agent wallet & mandates](AGENT.md)
