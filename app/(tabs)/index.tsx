@@ -11,6 +11,7 @@ import { Avatar, Eyebrow, QuickAction, StatusDot, Sparkline } from '@/components
 import { copyWithAutoClear } from '@/utils/clipboard';
 import { getCachedReserve, fetchReserve } from '@/wallet/meshpay';
 import { tryAdd, truncate, exact6 } from '@/utils/money';
+import { useOnline } from '@/hooks/useOnline';
 import { ACTIVE_CHAIN } from '@/constants/chain';
 import { COLORS, SPACING, RADIUS, FONTS } from '@/constants/theme';
 import type { TransactionRow } from '@/db/queries';
@@ -45,6 +46,7 @@ function ActivityRow({ tx, myAddress }: { tx: TransactionRow; myAddress: string 
 export default function WalletScreen() {
   const { address, balance, stale, balanceAt, isLoading, refresh } = useWallet();
   const { transactions, pendingCount } = useTransactions();
+  const online = useOnline();
 
   const [myName, setMyNameState] = useState('');
   useFocusEffect(useCallback(() => { try { setMyNameState(getMyName()); } catch { setMyNameState(''); } }, []));
@@ -100,16 +102,15 @@ export default function WalletScreen() {
       >
         {/* top bar */}
         <View style={styles.topBar}>
-          <TouchableOpacity style={styles.topLeft} activeOpacity={0.8} onPress={() => router.push('/(tabs)/settings')} accessibilityLabel="Open your wallet profile">
-            <Avatar seed={address ?? 'You'} size={40} />
+          <View style={styles.topLeft}>
             <View>
               <Text style={styles.greeting}>Welcome back</Text>
-              <Text style={styles.greetingName}>{myName || 'Your wallet'}</Text>
+              <Text style={styles.greetingName} numberOfLines={1}>{myName || 'Your wallet'}</Text>
             </View>
-          </TouchableOpacity>
-          <View style={styles.pill}>
-            <View style={styles.liveDot} />
-            <Text style={styles.pillText}>{ACTIVE_CHAIN.name}</Text>
+          </View>
+          <View style={[styles.pill, !online && styles.pillOff]}>
+            <View style={[styles.liveDot, !online && styles.liveDotOff]} />
+            <Text style={[styles.pillText, !online && styles.pillTextOff]}>{online ? 'Online' : 'Offline'}</Text>
           </View>
         </View>
 
@@ -248,6 +249,9 @@ export default function WalletScreen() {
 }
 
 const styles = StyleSheet.create({
+  pillOff: { borderColor: 'rgba(245,166,35,0.4)' },
+  liveDotOff: { backgroundColor: COLORS.warning },
+  pillTextOff: { color: COLORS.warning },
   staleNote: { fontSize: 12, color: COLORS.warning, textAlign: 'center', marginTop: 8, paddingHorizontal: SPACING.md },
   faucetCard: {
     backgroundColor: COLORS.accentSoft, borderWidth: 1, borderColor: 'rgba(62,217,184,0.28)', borderRadius: RADIUS.lg,
