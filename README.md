@@ -127,7 +127,7 @@ A spending envelope that automation can never exceed: per-transaction, daily and
 **Verified by running it**
 - A voucher signed on the web wallet was settled on Arc Testnet and the recipient's balance rose by exactly the amount (first funded end-to-end test).
 - Mobile- and web-signed vouchers validate against the live contract (valid signature, wrong signer and expired all return the correct codes), and the mobile codec decodes with the web decoder.
-- Phone app: typecheck, 56 tests (chat protocol cross-compatibility with the Arc Studio web wallet, all published test vectors, 33 hostile-input checks plus phone-specific ones), and the Android and iOS JavaScript bundles build. A funded end-to-end run on Arc Testnet: deposit, sign offline with the phone's code, check, settle by a third party, courier fee paid, replay rejected.
+- Phone app: typecheck, 56 tests (chat protocol cross-compatibility with the Wayamesh web wallet, all published test vectors, 33 hostile-input checks plus phone-specific ones), and the Android and iOS JavaScript bundles build. A funded end-to-end run on Arc Testnet: deposit, sign offline with the phone's code, check, settle by a third party, courier fee paid, replay rejected.
 - Web wallet: see [meshpay-arc](https://github.com/Tevin-Isaac/meshpay-arc) for its checks.
 - Chat: seal/open, tamper and forgery rejection, signed expiry, purge keeping contacts and payments, and a live message round trip through two public relays.
 - Ramp server: 17 tests and a mock-mode on-ramp.

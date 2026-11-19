@@ -16,7 +16,7 @@ import {
 import { getSession, unlockChat } from './identity';
 import { RelayPool } from './relay';
 
-// Phone chat service: end-to-end encrypted messages over untrusted public Nostr relays, wire-compatible with the Arc Studio
+// Phone chat service: end-to-end encrypted messages over untrusted public Nostr relays, wire-compatible with the
 // web wallet. The chat key is the wallet key, held in memory for the app session only (see identity.ts): relays are
 // subscribed only while the session is unlocked and the app is foregrounded.
 // Messages self-delete after 24 hours (client policy + NIP-40 tag on relay events). Contacts and payments are never purged.

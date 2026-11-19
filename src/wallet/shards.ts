@@ -1,7 +1,7 @@
 import { ethers } from 'ethers';
 
 // Pure shard helpers (no keystore import, so they run under node tests). Payload format {v:1,i,t,n,a,s} is shared with
-// the Arc Studio web wallet (section 7 of its porting guide).
+// the Wayamesh web wallet (section 7 of its porting guide).
 
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const sss = require('shamirs-secret-sharing') as {

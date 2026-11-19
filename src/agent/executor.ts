@@ -43,7 +43,7 @@ export async function runDueInstructions(wallet: ethers.Wallet): Promise<Executi
 
   for (const ins of getDueInstructions(now)) {
     const amount = BigInt(ins.amount);
-    // Per-schedule end date and total cap (Arc Studio autopilot parity). A blocked schedule is paused and logged, never silently skipped.
+    // Per-schedule end date and total cap (the web wallet autopilot parity). A blocked schedule is paused and logged, never silently skipped.
     if (ins.until_at > 0 && now > ins.until_at) {
       setInstructionStatus(ins.id, 'done', 'Reached its end date');
       logAudit({ kind: 'execution', to: ins.to_addr, amount, allowed: false, reason: `Standing payment ended: ${ins.label}` });

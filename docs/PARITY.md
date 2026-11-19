@@ -1,6 +1,6 @@
-# Feature parity: Arc Studio web wallet vs this phone app
+# Feature parity: Wayamesh web wallet vs this phone app
 
-Source of truth for the protocol is the Arc Studio export (`docs/PORTING-TO-WAYAMESH-MOBILE.md`, `docs/SECURITY.md`). This table was
+Source of truth for the protocol is the export (`docs/PORTING-TO-WAYAMESH-MOBILE.md`, `docs/SECURITY.md`). This table was
 built by reading its `src/lib` and `src/components` (AgentSheet, SecuritySheet/SecurityCards, CardConfirm, ContactSheet, Thread,
 ErrorBoundary, LimitsSheet, ReceiveSheet/ScanSheet, SendSheet, Onboarding, PinField, MpesaSheet, shell/ and tabs/).
 Note: the PNGs in its `docs/screenshots/` are corrupted in the download (the first byte is damaged), so they could not be viewed;
@@ -8,7 +8,7 @@ this inventory comes from the code.
 
 "Done" means implemented and covered by a unit test or a typecheck/bundle. Nothing here has been run on a physical phone.
 
-| Feature | Arc Studio web | Phone before this pass | Action / status |
+| Feature | Web wallet | Phone before this pass | Action / status |
 |---|---|---|---|
 | Wallet creation, same derivation (m/44'/60'/0'/0/0) | 12 words, PIN | 24 words, hardware keystore | Keep. Same address for the same phrase (test vector reproduced) |
 | Unlock | 6-digit PIN vault, lockout | Biometric / OS keystore | Keep (stronger than a web PIN) |

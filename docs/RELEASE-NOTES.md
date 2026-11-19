@@ -6,7 +6,7 @@ Testnet beta. Not independently audited. **Do not use with real money.**
 
 * **Offline payments are MeshPayV2 reserve vouchers** (`mp2:`): EIP-712 signed, backed by an on-chain reserve, any phone can
   settle and keep the 0.01 USDC courier fee. Signature vectors match the web wallet.
-* **New chat protocol, compatible with the Arc Studio web wallet.** Wallet-key identity, `mpc1:` contact cards, sealed boxes
+* **New chat protocol, compatible with the Wayamesh web wallet.** Wallet-key identity, `mpc1:` contact cards, sealed boxes
   (ephemeral ECDH, HKDF, XChaCha20-Poly1305), EIP-191 signed messages, Nostr kind 1059 events, `mpm1:` offline codes, relays
   nos.lol and relay.primal.net. A message from the phone opens on the web wallet and the other way round (proved by a test that
   imports the web wallet's own crypto module).

@@ -1,6 +1,6 @@
 import { cleanText, isAddress, toChecksumAddress } from '../chat/crypto';
 
-// Payment-request links, shared with the Arc Studio web wallet:
+// Payment-request links, shared with the Wayamesh web wallet:
 //   meshpay:<address>?amount=<decimal>&ref=<0x32 bytes>&note=<text>
 // Everything in a link comes from a stranger, so each field is validated and cleaned.
 

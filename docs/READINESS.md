@@ -12,7 +12,7 @@ Legend: ✅ done and checked · 🟡 partly done or not checked on real devices 
 | Offline-signed payment settled on-chain by a third party | Funded end-to-end run: deposit to reserve, offline voucher signed with the phone's code, `check()` = valid, settled by another wallet, courier fee paid, replay rejected. Settlement tx [`0x25ca1a7f…98c`](https://explorer.testnet.arc.io/tx/0x25ca1a7f55f93a996dc598f50f2b9c8eee34962da0c19cd60d17312f7b70a98c) |
 | Web wallet anyone can try | [wayamesh.xyz/app](https://wayamesh.xyz/app) (create wallet, reserve, send, receive, chat, history, mesh, settings) |
 | Android app | [v1.1.0-beta.1 APK](https://github.com/Tevin-Isaac/wayamesh-mobile/releases/latest/download/wayamesh-beta.apk) |
-| Phone and web interoperate | Cross-compat tests: the phone seals/opens the Arc Studio wallet's chat messages and reproduces its published test vectors |
+| Phone and web interoperate | Cross-compat tests: the phone seals/opens the wallet's chat messages and reproduces its published test vectors |
 | Security thinking is documented | [SECURITY.md](../SECURITY.md) (what is protected, what is not, mainnet checklist), [meshpay-arc docs/SECURITY.md](https://github.com/Tevin-Isaac/meshpay-arc/blob/main/docs/SECURITY.md) |
 | Honest scope | READMEs list verified vs not verified; the site says testnet beta |
 

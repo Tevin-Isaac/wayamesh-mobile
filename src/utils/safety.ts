@@ -1,7 +1,7 @@
 import { MESHPAY_ADDRESS, USDC_ERC20 } from '../mesh/voucher';
 
 // Input-safety helpers shared by send, chat-pay, add-contact and chat display (pure: no React Native imports, so they
-// are covered by tests/security.test.ts). Ported from the Arc Studio web wallet's guard.ts / format.ts.
+// are covered by tests/security.test.ts). Ported from the Wayamesh web wallet's guard.ts / format.ts.
 
 export const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000';
 

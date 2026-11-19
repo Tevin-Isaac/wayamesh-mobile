@@ -65,7 +65,7 @@ function ensureTables(): void {
 let migrated = false;
 
 /**
- * One-time migration to the Arc Studio compatible chat protocol (wallet-key identity). Conversations and chat keys from the
+ * One-time migration to the web-wallet compatible chat protocol (wallet-key identity). Conversations and chat keys from the
  * previous design cannot be read by the new protocol, so they are dropped. Contacts keep name, address and phone label; their old
  * (derived) chat public keys are cleared so a fresh `mpc1:` card must be added before chatting again. Payments, vouchers and
  * settlement status are NOT touched.

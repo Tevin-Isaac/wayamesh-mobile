@@ -2,7 +2,7 @@ import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { COLORS, SPACING, RADIUS } from '@/constants/theme';
 
-// A render error anywhere below must never leave the user with a blank, permanently broken app (the Arc Studio review found a
+// A render error anywhere below must never leave the user with a blank, permanently broken app (the security review found a
 // stranger's malformed chat message crashing the whole app). The boundary shows a recoverable screen instead.
 
 interface Props { children: React.ReactNode; label?: string }

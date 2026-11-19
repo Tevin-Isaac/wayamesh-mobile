@@ -1,5 +1,5 @@
 /**
- * Wayamesh chat protocol, byte-compatible with the Arc Studio web wallet (docs/PORTING-TO-WAYAMESH-MOBILE.md, section 5).
+ * Wayamesh chat protocol, byte-compatible with the Wayamesh web wallet (docs/PORTING-TO-WAYAMESH-MOBILE.md, section 5).
  * Pure module: only @noble imports, no React Native, so it runs unchanged under node for the cross-compat tests.
  *
  *  - Identity is the WALLET key (secp256k1). No separate chat key.

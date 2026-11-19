@@ -9,7 +9,7 @@ import { cleanText } from '@/chat/crypto';
 import { startChat } from '@/chat/service';
 import { COLORS, SPACING, RADIUS, FONTS } from '@/constants/theme';
 
-// "My card": the Arc Studio compatible `mpc1:` contact card others scan or paste to message you. Public data: wallet address,
+// "My card": the web-wallet compatible `mpc1:` contact card others scan or paste to message you. Public data: wallet address,
 // compressed public key and a display name. The same card format works in the web wallet and the phone app.
 
 export default function MyCardScreen() {

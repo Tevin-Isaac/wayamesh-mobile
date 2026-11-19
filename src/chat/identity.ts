@@ -4,7 +4,7 @@ import { loadWallet } from '@/wallet/keystore';
 import { getMeta, setMeta } from '@/db/chat';
 import { encodeCard, pubkeyOf, toChecksumAddress, addressOfPubkey, type Address, type Hex, type Signer, signerFromKey } from './crypto';
 
-// Phone chat identity = the WALLET key (same as the Arc Studio web wallet). The wallet key is biometric-gated, so chat is
+// Phone chat identity = the WALLET key (same as the Wayamesh web wallet). The wallet key is biometric-gated, so chat is
 // unlocked ONCE per app session (one biometric prompt when the user opens Chats, sends or pays). While unlocked the key lives
 // only in memory (never written anywhere) and is wiped when the app leaves the foreground, on lock, and on logout.
 // Nothing about chat is persisted unprotected: the previous design's derived chat key (SecureStore) is deleted at first run.

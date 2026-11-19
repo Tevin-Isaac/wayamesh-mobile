@@ -3,7 +3,7 @@ import { getSetting, setSetting } from '@/db/appSettings';
 import { formatUsdc, parseUsdc } from '@/mesh/voucher';
 
 // Spending limits for manual payments (per payment and per rolling 24h), enforced on the device before anything is signed.
-// Ported from the Arc Studio web wallet's policy.ts. Lowering a limit is free; RAISING one needs a fresh biometric check
+// Ported from the Wayamesh web wallet's policy.ts. Lowering a limit is free; RAISING one needs a fresh biometric check
 // (see requireReauth in src/utils/reauth.ts, used by the Settings screen). A bad stored value falls back to the default
 // instead of switching the limit off.
 

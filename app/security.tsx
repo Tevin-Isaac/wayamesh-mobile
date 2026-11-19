@@ -2,7 +2,7 @@ import { View, Text, StyleSheet, ScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { COLORS, SPACING, RADIUS } from '@/constants/theme';
 
-// An honest statement of what is and is not protected. Mirrors the "What is still true" section of the Arc Studio
+// An honest statement of what is and is not protected. Mirrors the "What is still true" section of the
 // SECURITY.md, adapted to the phone. This app is a TESTNET build and has not been independently audited.
 
 const PROTECTED = [

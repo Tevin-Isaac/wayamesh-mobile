@@ -37,7 +37,7 @@ The web wallet's detailed review lives in [`meshpay-arc/docs/SECURITY.md`](https
 
 ## What was tested
 
-- 33 hostile-input checks for chat and payments, plus phone-specific checks (`npm run test:security`), and cross-compatibility tests that make the phone and the Arc Studio web wallet seal and open each other's messages and reproduce the published test vectors (`npm test`).
+- 33 hostile-input checks for chat and payments, plus phone-specific checks (`npm run test:security`), and cross-compatibility tests that make the phone and the Wayamesh web wallet seal and open each other's messages and reproduce the published test vectors (`npm test`).
 - The contract's own unit, fuzz and invariant tests live with its source in `meshpay-arc`.
 - A funded end-to-end run on Arc Testnet: deposit to the reserve, sign offline, check, settle by a third party, courier fee paid, replay rejected.
 
