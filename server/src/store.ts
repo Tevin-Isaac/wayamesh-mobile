@@ -28,6 +28,7 @@ export class Store {
     renameSync(tmp, this.file);
   }
   get(id: string) { return this.d.orders[id]; }
+  all() { return Object.values(this.d.orders); }
   find(pred: (o: Order) => boolean) { return Object.values(this.d.orders).find(pred); }
   put(o: Order) { o.updatedAt = Date.now(); this.d.orders[o.id] = o; this.save(); return o; }
   update(id: string, patch: Partial<Order>) {

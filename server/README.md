@@ -1,63 +1,72 @@
-# Wayamesh ramp server
+# WayaMesh ramp server (M-Pesa on-ramp and off-ramp)
 
-M-Pesa on-ramp (STK Push -> USDC) and off-ramp (USDC -> B2C payout) for Wayamesh on Arc Testnet.
-On testnet this is a **sandbox**: testnet USDC at a fixed demo FX rate (`USD_KES_RATE`).
+M-Pesa STK Push in (KES to USDC) and B2C out (USDC to KES) for the WayaMesh web wallet and the Android app, on Arc Testnet.
 
-## Run in mock mode (no Safaricom keys)
+**This is a testnet demo.** USDC on Arc Testnet has no value, the rate is a fixed demo rate (`USD_KES_RATE`), and by default the server runs in **mock mode**: Safaricom is simulated and no money moves. Real Safaricom is used only if the owner explicitly configures Daraja credentials.
 
+It is the same backend as `wayamesh-mobile/server`, plus `verifyVoucherDeposit`: a cash out can be paid from the user's MeshPay reserve (a voucher to the treasury, settled on chain), not just from USDC held on the device.
+
+## Run in mock mode
+
+```bash
+cd ramp-server
+npm install
+cp .env.example .env     # leave the Daraja values empty
+npm run dev              # http://localhost:8787
+npm test                 # 28 tests
+npm run e2e              # in a second terminal: full on-ramp against the running server
 ```
-cd server && npm i
-cp .env.example .env      # leave Daraja vars empty -> MPESA_MODE=mock
-npm run dev               # http://localhost:8787
-npm test
-```
 
-Mock mode simulates STK approval after ~5s and B2C success after ~3s; every response/order carries `mock: true`.
-Without `TREASURY_PRIVATE_KEY`, on-ramp payouts return a *simulated* tx hash (nothing is sent on-chain) and
-off-ramp is unavailable (`treasury: null` in `/config`). With a treasury key, USDC payouts are real Arc testnet transfers.
+Mock mode simulates the STK approval after about 5 seconds and the B2C result after about 3 seconds. Every order carries `mock: true`. Without `TREASURY_PRIVATE_KEY`, on-ramp payouts return a made-up transaction hash (nothing is sent) and cash out is unavailable (`treasury: null` in `/api/ramp/config`). With a treasury key, USDC payouts are real Arc Testnet transfers.
 
-Point the app at it: `EXPO_PUBLIC_RAMP_API_URL=http://<your-lan-ip>:8787`.
+The web wallet reaches it through the Vite proxy (`/ramp-api` to `:8787`) in `npm run dev` and `vite preview`, or through `VITE_RAMP_API_URL` for a deployed build.
 
 ## Endpoints
 
-- `GET  /api/ramp/config`
-- `POST /api/ramp/onramp/mpesa` `{address, phone, amountKes, issuedAt, signature}`
-- `POST /api/ramp/offramp/mpesa` `{address, phone, usdc, txHash, issuedAt, signature}`
-- `GET  /api/ramp/orders/:id`
-- `POST /api/ramp/mpesa/callback`, `/mpesa/b2c/result`, `/mpesa/b2c/timeout` (Safaricom webhooks, protected by `?token=CALLBACK_SECRET`)
+* `GET  /api/ramp/config`
+* `POST /api/ramp/onramp/mpesa` `{address, phone, amountKes, issuedAt, signature}`
+* `POST /api/ramp/offramp/mpesa` `{address, phone, usdc, txHash, deposit?: "native" | "voucher", issuedAt, signature}`
+* `GET  /api/ramp/orders/:id`
+* `POST /api/ramp/mpesa/callback`, `/mpesa/b2c/result`, `/mpesa/b2c/timeout`: Safaricom webhooks. **Always** need `?token=CALLBACK_SECRET`.
 
 Every user POST is signed (EIP-191) over the message built by `src/authMessage.ts`, valid for 5 minutes, single use.
-Off-ramp: the user first sends native USDC (18 dp) to the treasury; the server verifies the receipt
-(to, from, value, success, mined) and that the tx hash was never used before paying out.
 
-## Daraja sandbox credentials
+### Cash out, two ways
 
-1. Create an account at https://developer.safaricom.co.ke, create an app with "Lipa na M-Pesa Sandbox" and "B2C" enabled.
-2. Copy Consumer Key/Secret. Sandbox STK shortcode is `174379` with the public sandbox passkey shown on the "Test credentials" page.
-3. For B2C, use the sandbox initiator (`testapi`) and its password encrypted with the sandbox cert (see go-live below) as `SECURITY_CREDENTIAL`.
-4. Set `MPESA_MODE=sandbox` and fill the vars in `.env`.
+1. `deposit: "native"` (default): the user sent native USDC (18 dp on Arc) to the treasury. The server checks the transaction (to, from, value, success, mined).
+2. `deposit: "voucher"`: the user paid the treasury from their MeshPay reserve and the settlement transaction was mined. The server checks the receipt for a `Settled` event from the MeshPay contract with `from` = the user, `to` = the treasury and `amount` = the requested USDC (6 dp).
 
-## Expose callbacks
+Either way a transaction hash can be used once, and the payout starts only after verification.
 
-Safaricom must reach `DARAJA_CALLBACK_BASE_URL` over public HTTPS:
+## Configuration
 
-```
-ngrok http 8787          # or: cloudflared tunnel --url http://localhost:8787
-```
-Put the https URL in `DARAJA_CALLBACK_BASE_URL` and set a random `CALLBACK_SECRET`.
+See `.env.example`. Notable: `MPESA_TX_TYPE` (`paybill` default, or `till`), `MAX_KES` (cap per request), `CALLBACK_SECRET`, `ALLOWED_ORIGINS`.
 
-## Fund the treasury
+In `sandbox` or `production` mode the server **refuses to start** if `CALLBACK_SECRET` is shorter than 24 characters or the default, `DARAJA_CALLBACK_BASE_URL` is not https, `ALLOWED_ORIGINS` is `*`, or the B2C initiator settings are missing.
 
-Generate a throwaway key, set `TREASURY_PRIVATE_KEY`, start the server (it logs the address), and request testnet USDC
-at https://faucet.circle.com (Arc Testnet). The same wallet receives off-ramp deposits.
+## What is verified (and what is not)
 
-## Going live: honest checklist
+Verified by running it:
 
-- Safaricom Daraja **go-live** approval (production app, production credentials, whitelisted callback URLs).
-- A real **Paybill or Till** (Lipa na M-Pesa Online) for STK, and a B2C-enabled shortcode with float.
-- B2C **initiator** user + `SECURITY_CREDENTIAL` = initiator password RSA-encrypted with Safaricom's production certificate, base64.
-- **KYC / AML / legal**: selling and buying crypto for KES is regulated (Kenya's VASP Act 2025, CBK/CMA, Safaricom terms). **We are not a licensed VASP**; this code does not make you compliant. Get legal advice before taking real money.
-- **Mainnet USDC**: Arc mainnet is not live; real money needs a mainnet treasury with USDC liquidity and proper key custody (HSM/KMS, not an env var), plus a real FX source instead of a fixed rate.
-- Hardening: replace the JSON store with a real DB, add monitoring/alerting, reconcile Safaricom statements, and limit per-user/day volume.
-- Webhooks are not signed by Safaricom; rely on the secret token plus IP allow-listing at your proxy.
-- B2C timeouts are marked failed for manual review (never auto-refunded, as Safaricom may still pay).
+* 28 unit tests (`npm test`): auth and replay, pricing, idempotent payout, direct deposit verification (ok, wrong to, wrong from, wrong value, reverted, unconfirmed, missing), voucher deposit verification (ok, wrong payer, wrong recipient, wrong amount, wrong contract, failed tx, not mined, feature off, reused hash through the service), `MPESA_TX_TYPE` for both values and the B2C URL (with a stubbed `fetch`), unsafe-config refusal, `MAX_KES`, webhook token, log redaction.
+* A mock-mode on-ramp end to end against the running server with a throwaway wallet (`npm run e2e`), and through the web UI in headless Chrome.
+
+**Not verified:** any real Safaricom call (sandbox or production), the real STK callback shape from Safaricom, B2C payouts, cash out against the live chain (the deposit checks are tested against stubbed chain data, not a real Arc transaction), and treasury payouts with a real key.
+
+## Go-live checklist (honest)
+
+Nothing here makes this production-ready.
+
+1. **Safaricom approval.** Create a Daraja app, then request go-live for production credentials and whitelisted callback URLs. The sandbox shortcode is `174379` with the public sandbox passkey.
+2. **Paybill or Till.** A real shortcode for Lipa na M-Pesa Online. Set `MPESA_TX_TYPE=paybill` or `till` to match it.
+3. **B2C.** A B2C-enabled shortcode with float, an initiator user, and `SECURITY_CREDENTIAL` = the initiator password RSA-encrypted with **Safaricom's certificate** (sandbox and production certificates differ), base64.
+4. **Public HTTPS callback.** Safaricom must reach `DARAJA_CALLBACK_BASE_URL`. Set a random `CALLBACK_SECRET`. Safaricom does not sign webhooks, so also allow-list Safaricom's IPs at your proxy.
+5. **Money and law.** Selling and buying crypto for KES is regulated (Kenya's VASP Act 2025, CBK, CMA, Safaricom terms). This code does not make you compliant and the operator is not a licensed VASP. Get legal advice first.
+6. **Mainnet.** Arc mainnet is not live. Real money needs a mainnet treasury, real liquidity, key custody in an HSM or KMS (not an env var), and a real FX source.
+7. **Engineering.** Replace the JSON store with a database, add monitoring and reconciliation against Safaricom statements, and per-user and daily volume limits.
+
+B2C timeouts are marked failed for manual review and never auto-refunded, because Safaricom may still pay. A failed B2C start refunds the USDC.
+
+## Notes on running the tests
+
+`vitest.config.ts` is deliberate. Without it vitest walks up to the web app's `../vite.config.ts`, whose Node polyfill plugin replaces `node:crypto` and `node:fs` with browser shims, and every server test fails with errors like `randomUUID is not a function`.

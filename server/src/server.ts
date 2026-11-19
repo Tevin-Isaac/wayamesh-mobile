@@ -1,7 +1,7 @@
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
 import { timingSafeEqual } from 'node:crypto';
 import type { Config } from './config.js';
-import { HttpError, type RampService } from './ramp.js';
+import { HttpError, redact, type RampService } from './ramp.js';
 
 const MAX_BODY = 16 * 1024;
 
@@ -65,8 +65,8 @@ export function createApp(cfg: Config, ramp: RampService) {
 
       if (req.method === 'POST') {
         if (path.startsWith('/api/ramp/mpesa/')) {
-          // Safaricom webhooks: shared-secret token in query; always ACK 200 to avoid retries storms.
-          if (!cfg.mock && !safeEq(url.searchParams.get('token') ?? '', cfg.callbackSecret)) throw new HttpError(403, 'forbidden');
+          // Safaricom webhooks: shared-secret token in the query string (required in every mode, constant-time compare).
+          if (!safeEq(url.searchParams.get('token') ?? '', cfg.callbackSecret)) throw new HttpError(403, 'forbidden');
           const body = await readBody(req);
           if (path.endsWith('/callback')) await ramp.onStkCallback(body);
           else if (path.endsWith('/b2c/result')) await ramp.onB2cResult(body);
@@ -84,7 +84,7 @@ export function createApp(cfg: Config, ramp: RampService) {
       throw new HttpError(404, 'not found');
     } catch (e: any) {
       if (e instanceof HttpError) return send(e.status, { error: e.message });
-      console.error('unhandled error:', e?.message);
+      console.error('unhandled error:', redact(e?.message));
       return send(500, { error: 'internal error' });
     }
   });

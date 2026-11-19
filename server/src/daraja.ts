@@ -53,7 +53,7 @@ export class RealDaraja implements Daraja {
       BusinessShortCode: this.c.shortcode,
       Password: stkPassword(this.c.shortcode, this.c.passkey, ts),
       Timestamp: ts,
-      TransactionType: process.env.MPESA_TX_TYPE === 'till' ? 'CustomerBuyGoodsOnline' : 'CustomerPayBillOnline',
+      TransactionType: this.c.txType === 'till' ? 'CustomerBuyGoodsOnline' : 'CustomerPayBillOnline',
       Amount: amountKes, PartyA: phone, PartyB: this.c.shortcode, PhoneNumber: phone,
       CallBackURL: this.cb('/api/ramp/mpesa/callback'),
       AccountReference: ref.slice(0, 12), TransactionDesc: 'Wayamesh USDC',

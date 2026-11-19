@@ -1,12 +1,12 @@
 import { describe, it, expect, vi } from 'vitest';
-import { Wallet, parseUnits } from 'ethers';
+import { Wallet, parseUnits, Interface, ZeroHash } from 'ethers';
 import { normalizePhone, buildAuthMessage } from '../src/authMessage.js';
 import { verifyAuth } from '../src/auth.js';
 import { loadConfig } from '../src/config.js';
 import { Store } from '../src/store.js';
 import { MockDaraja } from '../src/daraja.js';
 import { RampService, kesToUsdc, usdcToKes } from '../src/ramp.js';
-import { verifyDeposit, type DepositChain, type Treasury } from '../src/treasury.js';
+import { verifyDeposit, verifyVoucherDeposit, type DepositChain, type Treasury } from '../src/treasury.js';
 
 describe('phone', () => {
   it('normalises', () => {
@@ -114,5 +114,37 @@ describe('offramp deposit verification', () => {
     const r = await go();
     expect(r.status).toBe('delivering');
     await expect(go()).rejects.toThrow(/already used/);
+  });
+});
+
+describe('offramp voucher deposit verification (paid from the MeshPay reserve)', () => {
+  const iface = new Interface(['event Settled(address indexed from, address indexed to, bytes32 indexed ref, uint256 nonce, uint256 amount, uint256 fee, address relayer)']);
+  const meshpay = Wallet.createRandom().address;
+  const treasury = Wallet.createRandom().address;
+  const user = Wallet.createRandom().address;
+  const hash = '0x' + 'ab'.repeat(32);
+  const chainWith = (logs: any[], status = 1): DepositChain => ({
+    getTransaction: async () => null,
+    getReceipt: async () => ({ status, blockNumber: 1 }),
+    waitReceipt: async () => ({ status, blockNumber: 1 }),
+    getLogs: async () => logs,
+  });
+  const logFor = (from: string, to: string, amount: bigint, address = meshpay) => {
+    const e = iface.encodeEventLog('Settled', [from, to, ZeroHash, 1n, amount, 0n, user]);
+    return { address, topics: e.topics, data: e.data };
+  };
+  const args = { txHash: hash, from: user, treasury, usdc: '2.5', meshpay };
+  it('accepts a matching Settled event', async () => {
+    expect((await verifyVoucherDeposit(chainWith([logFor(user, treasury, parseUnits('2.5', 6))]), args)).ok).toBe(true);
+  });
+  it('rejects wrong payer, wrong recipient, wrong amount, wrong contract, failed tx, not enabled', async () => {
+    const amt = parseUnits('2.5', 6);
+    const other = Wallet.createRandom().address;
+    expect((await verifyVoucherDeposit(chainWith([logFor(other, treasury, amt)]), args)).ok).toBe(false);
+    expect((await verifyVoucherDeposit(chainWith([logFor(user, other, amt)]), args)).ok).toBe(false);
+    expect((await verifyVoucherDeposit(chainWith([logFor(user, treasury, amt - 1n)]), args)).ok).toBe(false);
+    expect((await verifyVoucherDeposit(chainWith([logFor(user, treasury, amt, other)]), args)).ok).toBe(false);
+    expect((await verifyVoucherDeposit(chainWith([logFor(user, treasury, amt)], 0), args)).ok).toBe(false);
+    expect((await verifyVoucherDeposit(chainWith([logFor(user, treasury, amt)]), { ...args, meshpay: '' })).ok).toBe(false);
   });
 });

@@ -2,13 +2,17 @@ import { randomUUID } from 'node:crypto';
 import type { Config } from './config.js';
 import type { Store, Order } from './store.js';
 import type { Daraja } from './daraja.js';
-import { verifyDeposit, type Treasury, type DepositChain } from './treasury.js';
+import { verifyDeposit, verifyVoucherDeposit, type Treasury, type DepositChain } from './treasury.js';
 import { verifyAuth } from './auth.js';
 import { normalizePhone } from './authMessage.js';
 
 export class HttpError extends Error {
   constructor(public status: number, msg: string) { super(msg); }
 }
+
+/** Strip phone numbers, long hex (keys / hashes) and secrets from text before it is logged. */
+export const redact = (t: unknown) =>
+  String(t ?? '').replace(/\+?254\d{9}/g, '254*********').replace(/\b0x[0-9a-fA-F]{40,}\b/g, '0x…').replace(/token=[^&\s]+/g, 'token=…').slice(0, 300);
 
 export const maskPhone = (p: string) => p.slice(0, 6) + '***' + p.slice(-3);
 
@@ -38,10 +42,29 @@ export class RampService {
   config() {
     const c = this.d.cfg;
     return {
-      mock: c.mock, network: 'arc-testnet', usdKes: c.usdKes, feeBps: c.feeBps,
+      mock: c.mock, network: c.networkName, meshpay: c.meshpay || null, usdKes: c.usdKes, feeBps: c.feeBps,
       minKes: c.minKes, maxKes: c.maxKes, treasury: this.d.treasury.address,
       treasuryMock: this.d.treasury.mock,
     };
+  }
+
+  /**
+   * Mock mode only. The simulated Safaricom callbacks are in-memory timers, so a restart would leave
+   * pending mock orders waiting forever (the client polls until it gives up). Re-arm them on startup.
+   */
+  resumeMock() {
+    if (!this.d.cfg.mock) return 0;
+    let n = 0;
+    for (const o of this.d.store.all()) {
+      if (o.kind === 'onramp' && o.status === 'pending' && o.checkoutRequestId) {
+        n++; const id = o.checkoutRequestId;
+        setTimeout(() => void this.onStkCallback(mockStk(id, o.kes)), 1000);
+      } else if (o.kind === 'offramp' && o.status === 'delivering' && o.originatorConversationId) {
+        n++; const id = o.originatorConversationId;
+        setTimeout(() => void this.onB2cResult(mockB2c(id, o.kes)), 1000);
+      }
+    }
+    return n;
   }
 
   private noReplay(sig: string) {
@@ -78,7 +101,7 @@ export class RampService {
       if (c.mock) setTimeout(() => void this.onStkCallback(mockStk(r.checkoutRequestId, kes)), this.d.mockDelayMs?.stk ?? 5000);
     } catch (e: any) {
       this.d.store.update(id, { status: 'failed', reason: 'Could not send M-Pesa prompt' });
-      console.error('stk push failed', id, e.message);
+      console.error('stk push failed', id.slice(0, 8), redact(e.message));
     }
     return { id, status: this.d.store.get(id).status, mock: c.mock };
   }
@@ -110,7 +133,7 @@ export class RampService {
       const r = await this.d.treasury.sendUsdc(o.address, o.usdc);
       this.d.store.update(id, { status: 'completed', txHash: r.txHash, mock: o.mock || r.mock });
     } catch (e: any) {
-      console.error('payout failed', id, e.message);
+      console.error('payout failed', id.slice(0, 8), redact(e.message));
       this.d.store.update(id, { status: 'failed', reason: 'M-Pesa received but USDC delivery failed — support will resolve' });
     }
   }
@@ -126,7 +149,9 @@ export class RampService {
     if (!treasury) throw new HttpError(503, 'treasury not configured');
     const txHash = String(b.txHash);
     if (!/^0x[0-9a-fA-F]{64}$/.test(txHash)) throw new HttpError(400, 'invalid tx hash');
-    const v = await verifyDeposit(this.d.chain, { txHash, from: address, treasury, usdc });
+    const v = b.deposit === 'voucher'
+      ? await verifyVoucherDeposit(this.d.chain, { txHash, from: address, treasury, usdc, meshpay: c.meshpay })
+      : await verifyDeposit(this.d.chain, { txHash, from: address, treasury, usdc });
     if (!v.ok) throw new HttpError(400, v.reason);
     const id = randomUUID();
     if (!this.d.store.useTx(txHash, id)) throw new HttpError(409, 'transaction already used');
@@ -138,7 +163,7 @@ export class RampService {
       this.d.store.update(id, { status: 'delivering', originatorConversationId: r.originatorConversationId });
       if (c.mock) setTimeout(() => void this.onB2cResult(mockB2c(r.originatorConversationId, kes)), this.d.mockDelayMs?.b2c ?? 3000);
     } catch (e: any) {
-      console.error('b2c failed', id, e.message);
+      console.error('b2c failed', id.slice(0, 8), redact(e.message));
       await this.failAndRefund(id, 'Could not start M-Pesa payout');
     }
     return { id, status: this.d.store.get(id).status };
