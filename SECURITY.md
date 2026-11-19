@@ -2,7 +2,7 @@
 
 **Status: testnet only. Not ready for real money.** This page says what is protected, what is not, and what must happen before any mainnet launch. It is written to match the code, not to reassure.
 
-The web wallet's detailed review lives in [`meshpay-arc/docs/SECURITY.md`](https://github.com/Tevin-Isaac/meshpay-arc/blob/master/docs/SECURITY.md). An AI-assisted review is **not** an independent audit.
+The web wallet's detailed review lives in [`meshpay-arc/docs/SECURITY.md`](https://github.com/Tevin-Isaac/meshpay-arc/blob/main/docs/SECURITY.md). An AI-assisted review is **not** an independent audit.
 
 ## What protects you today
 

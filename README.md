@@ -57,11 +57,11 @@ The QR code **is** the signed payment (`mp2:` + 178 bytes, base64url). Nothing e
 End-to-end encrypted messaging with contacts, plus payments inside the thread.
 
 - **Contacts.** Save a name, wallet address and an optional phone note (a label only; never used for lookup). You can pay any saved address immediately. To chat, exchange a **contact card** (QR or text). A card carries the address and chat public key; compare the **safety number** with your contact to be sure it is really them. Unknown senders land in a *message requests* inbox until you accept them (or block them).
-- **Encryption.** Each message is sealed to the recipient's key (secp256k1 ECDH + XChaCha20-Poly1305) and signed by the sender's wallet key, following the shared spec in [`meshpay-arc/docs/PORTING-TO-WAYAMESH-MOBILE.md`](https://github.com/Tevin-Isaac/meshpay-arc/blob/master/docs/PORTING-TO-WAYAMESH-MOBILE.md). The phone and the web wallet open each other's messages (proven by cross tests and the published test vectors). Because the wallet key is biometric-locked, the app asks for one biometric check per session when you open Chats or pay in a thread, and keeps the key in memory only until the app goes to the background.
+- **Encryption.** Each message is sealed to the recipient's key (secp256k1 ECDH + XChaCha20-Poly1305) and signed by the sender's wallet key, following the shared spec in [`meshpay-arc/docs/PORTING-TO-WAYAMESH-MOBILE.md`](https://github.com/Tevin-Isaac/meshpay-arc/blob/main/docs/PORTING-TO-WAYAMESH-MOBILE.md). The phone and the web wallet open each other's messages (proven by cross tests and the published test vectors). Because the wallet key is biometric-locked, the app asks for one biometric check per session when you open Chats or pay in a thread, and keeps the key in memory only until the app goes to the background.
 - **Transport.** Messages travel through free **public Nostr relays**, which are untrusted mailboxes — they see only sealed bytes under throwaway keys. There is no server of ours, so chat costs nothing to run.
 - **24-hour expiry.** Messages disappear after 24 hours: the expiry is signed into the message, set as a relay expiration tag, and enforced by local purges. Contacts and payment history are never purged.
 - **Pay in chat.** Paying from a thread sends the payment as a message with an **Accept** button, the same as scanning.
-- **Limits.** Text only, 1000 characters. A message to someone offline is delivered when they come online; relays only hold it briefly. The phone receives messages while the app is open (no push notifications yet).
+- **Limits.** Text only, 500 characters. A message to someone offline is delivered when they come online; relays only hold it briefly. The phone receives messages while the app is open (no push notifications yet).
 - **Bluetooth chat (Android) is experimental** — see below.
 
 Details: [docs/chat.md](docs/chat.md).
@@ -149,9 +149,10 @@ npx tsc --noEmit                       # typecheck
 # Android build via EAS
 npx eas-cli build --platform android --profile preview
 
-# Web wallet
-cd web && npm install && npm run dev   # http://localhost:5173/app
-npm test && npm run build
+# Web wallet: lives in its own repo, https://github.com/Tevin-Isaac/meshpay-arc
+#   git clone https://github.com/Tevin-Isaac/meshpay-arc && cd meshpay-arc
+#   npm install && npm run dev      # or: bun install && bun run dev
+#   npm test && npx vite build
 
 # M-Pesa ramp backend (mock mode needs no credentials)
 cd server && npm install && npm run dev
@@ -159,7 +160,7 @@ npm test
 ```
 
 Environment variables (all optional on testnet):
-- `EXPO_PUBLIC_RAMP_API_URL` / `VITE_RAMP_API_URL` — URL of the `server/` ramp backend.
+- `EXPO_PUBLIC_RAMP_API_URL` — URL of the `server/` ramp backend (the web wallet uses `VITE_RAMP_API_URL`, set when it is built).
 - `EXPO_PUBLIC_RAMP_PROVIDER` / `EXPO_PUBLIC_RAMP_API_KEY` — optional hosted card/bank provider (mainnet only).
 - See [`server/.env.example`](server/.env.example) for the backend. **Never commit `.env` files.**
 
@@ -174,13 +175,13 @@ src/agent/             spending-mandate policy engine, standing payments, offlin
 src/ramp/              ramp server client
 src/db/                SQLite (transactions, contacts, chat, reserve cache)
 modules/wayamesh-ble/  native Kotlin BLE peripheral (advertise + GATT server)
-web/                   the web wallet (Vite + React) — built into wayamesh.xyz/app
+(the web wallet is in the separate meshpay-arc repo)
 server/                M-Pesa (Daraja) ramp backend
 ussd-service/          standalone USSD backend prototype
 docs/                  chat design, pitch deck
 ```
 
-The website ([Tevin-Isaac/wayamesh](https://github.com/Tevin-Isaac/wayamesh)) is a Next.js site that mounts the built web wallet at `/app`. Update it with `web/scripts/sync-to-website.sh "<path to the website repo>"`.
+The website ([Tevin-Isaac/wayamesh](https://github.com/Tevin-Isaac/wayamesh)) is a Next.js site that mounts the built web wallet at `/app`. The wallet's source and its `scripts/sync-to-website.sh` live in [Tevin-Isaac/meshpay-arc](https://github.com/Tevin-Isaac/meshpay-arc).
 
 ## Roadmap
 
@@ -193,7 +194,7 @@ Real-device Bluetooth testing and multi-hop relay, iOS peripheral, push notifica
 - [Chat design and limits](docs/chat.md)
 - [Smart accounts & gasless USDC](SMART_ACCOUNTS.md)
 - [Agent wallet & mandates](AGENT.md)
-- [Web wallet](web/README.md) · [M-Pesa ramp server](server/README.md) · [USSD service](ussd-service/README.md)
+- [Web wallet (meshpay-arc)](https://github.com/Tevin-Isaac/meshpay-arc) · [M-Pesa ramp server](server/README.md) · [USSD service](ussd-service/README.md)
 
 ## License
 
