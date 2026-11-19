@@ -91,9 +91,7 @@
       }
     },
     "owner": "tevinprime66",
-    "runtimeVersion": {
-      "policy": "appVersion"
-    },
+    "runtimeVersion": "1.1.0",
     "updates": {
       "url": "https://u.expo.dev/de5243ef-44ee-472f-8322-f928b3013f0a",
       "fallbackToCacheTimeout": 0
