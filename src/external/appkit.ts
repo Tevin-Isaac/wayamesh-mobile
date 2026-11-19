@@ -8,7 +8,7 @@ import { arcTestnet } from 'viem/chains';
 // it is loaded only when the user opens Settings → External wallet, so the wallet works fully without it.
 //
 // The project id is public by design (it ships inside every app that uses WalletConnect).
-export const WALLETCONNECT_PROJECT_ID = 'd67d9c8e54efc7222feed4178262bda0';
+export const WALLETCONNECT_PROJECT_ID = '135eabf3b6763fbeb25a200a27506f67';
 
 // AppKit keeps its pairing/session state in this key-value store (JSON values, namespaced so it never touches our data).
 const PREFIX = '@wayamesh_appkit/';
