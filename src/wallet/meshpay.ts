@@ -140,6 +140,8 @@ export async function signVoucher(
   to: string,
   usdcAmount: string,
   feeUnits: bigint = DEFAULT_FEE_UNITS,
+  /** Invoice / request reference to carry inside the signed payment. A fresh random one when omitted. */
+  ref?: string,
 ): Promise<SignedVoucher> {
   const payment: Payment = {
     from: wallet.address,
@@ -148,7 +150,7 @@ export async function signVoucher(
     fee: feeUnits,
     nonce: randomNonce(),
     deadline: BigInt(Math.floor(Date.now() / 1000) + VOUCHER_TTL_SECONDS),
-    ref: randomRef(),
+    ref: ref ?? randomRef(),
   };
   const signature = await signPayment(wallet, payment);
   const voucher: Voucher = { payment, signature };

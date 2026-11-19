@@ -23,6 +23,9 @@ export function buildAuthMessage(p: {
 export interface RampServerConfig {
   mock: boolean; network: string; usdKes: number; feeBps: number;
   minKes: number; maxKes: number; treasury: string | null;
+  /** MeshPay settlement contract address when the server can verify reserve (voucher) cash outs; null/absent otherwise. */
+  meshpay?: string | null;
+  treasuryMock?: boolean;
 }
 export type OrderStatus = 'pending' | 'paid' | 'delivering' | 'completed' | 'failed';
 export interface RampOrder {
@@ -72,6 +75,8 @@ export async function startOnramp(
 /** `usdc` is a decimal string with at most 6 dp; txHash is the deposit to the treasury. */
 export async function startOfframp(
   wallet: ethers.Wallet, phoneInput: string, usdc: string, txHash: string,
+  /** 'native' = plain transfer to the treasury; 'voucher' = paid from the offline reserve by a settled voucher (txHash is the settlement tx). */
+  deposit: 'native' | 'voucher' = 'native',
 ): Promise<{ id: string; status: OrderStatus }> {
   const phone = normalizePhone(phoneInput);
   if (!phone) throw new Error('Enter a valid Kenyan phone number');
@@ -80,7 +85,7 @@ export async function startOfframp(
     buildAuthMessage({ action: 'offramp', address: wallet.address, phone, amount: usdc, issuedAt }),
   );
   return call('/api/ramp/offramp/mpesa', {
-    method: 'POST', body: JSON.stringify({ address: wallet.address, phone, usdc, txHash, issuedAt, signature }),
+    method: 'POST', body: JSON.stringify({ address: wallet.address, phone, usdc, txHash, deposit, issuedAt, signature }),
   });
 }
 

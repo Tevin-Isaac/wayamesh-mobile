@@ -16,6 +16,8 @@
   "exclude": [
     "node_modules",
     "web",
+    "tests",
+    "vitest.config.ts",
     "server",
     "ussd-service",
     "dist"

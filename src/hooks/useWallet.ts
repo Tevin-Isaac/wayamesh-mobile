@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { hasWallet, createWallet, loadWallet, deleteWallet, importWallet } from '@/wallet/keystore';
 import { getWallet, clearWalletData } from '@/db/queries';
+import { lockChat } from '@/chat/identity';
 import { getUsdcBalance } from '@/wallet/transactions';
 
 export interface WalletState {
@@ -59,6 +60,7 @@ export function useWallet() {
   }, []);
 
   const logout = useCallback(async () => {
+    lockChat();
     await deleteWallet();
     clearWalletData();
     setState({ address: null, balance: null, isLoading: false, hasWallet: false });

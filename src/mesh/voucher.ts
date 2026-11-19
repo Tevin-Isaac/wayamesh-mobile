@@ -102,6 +102,19 @@ export function fromB64Url(input: string): Uint8Array {
   return Uint8Array.from(out);
 }
 
+const HALF_N = 0x7fffffffffffffffffffffffffffffff5d576e7357a4501ddfe92f46681b20a0n;
+
+/**
+ * The contract accepts only one canonical form of a signature (v is 27 or 28, s is at most half the curve order).
+ * Anything else could never settle, so a receiver must not hold it as a payment.
+ */
+export function isCanonicalSignature(sig: string): boolean {
+  if (!/^0x[0-9a-fA-F]{130}$/.test(sig)) return false;
+  const v = parseInt(sig.slice(130, 132), 16);
+  const s = BigInt(`0x${sig.slice(66, 130)}`);
+  return (v === 27 || v === 28) && s > 0n && s <= HALF_N;
+}
+
 function uint(n: bigint, size: number): Uint8Array {
   return ethers.getBytes(ethers.zeroPadValue(ethers.toBeHex(n), size));
 }
@@ -135,6 +148,9 @@ export function decodeVoucher(text: string): Voucher {
     throw new Error('Unsupported or damaged payment code');
   }
   const at = (a: number, b: number) => ethers.hexlify(bytes.slice(a, b));
+  if (!isCanonicalSignature(at(113, 178))) {
+    throw new Error('This payment code has a malformed signature and could never settle');
+  }
   return {
     payment: {
       from: ethers.getAddress(at(1, 21)),

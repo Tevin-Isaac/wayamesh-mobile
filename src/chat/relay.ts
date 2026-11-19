@@ -5,8 +5,9 @@
  * here guarantees delivery, only "published to N relays".
  */
 import { RELAY_KIND, relayEventValid, type RelayEvent } from './crypto'
+import { CAPS } from '../utils/safety'
 
-export const DEFAULT_RELAYS = ['wss://nos.lol', 'wss://relay.primal.net', 'wss://relay.damus.io']
+export { DEFAULT_RELAYS } from './crypto'
 
 interface Conn {
   url: string
@@ -51,7 +52,7 @@ export class RelayPool {
 
   private sendReq(c: Conn) {
     if (!c.ws || !c.open || !this.filter) return
-    c.ws.send(JSON.stringify(['REQ', 'wayamesh', { kinds: [RELAY_KIND], '#p': [this.filter.x], since: this.filter.since }]))
+    c.ws.send(JSON.stringify(['REQ', 'meshpay', { kinds: [RELAY_KIND], '#p': [this.filter.x], since: this.filter.since }]))
   }
 
   private connect(c: Conn) {
@@ -68,10 +69,12 @@ export class RelayPool {
       ws.onmessage = (msg: { data: unknown }) => {
         try {
           const data = JSON.parse(String(msg.data)) as unknown[]
-          if (data[0] === 'EVENT' && data[2]) {
+          if (data[0] === 'EVENT' && data[2] && typeof data[2] === 'object') {
             const e = data[2] as RelayEvent
+            if (typeof e.id !== 'string') return
             if (this.seen.has(e.id) || !relayEventValid(e)) return
             this.seen.add(e.id)
+            if (this.seen.size > CAPS.seenIds) this.seen.delete(this.seen.values().next().value as string)
             this.handler?.(e)
           } else if (data[0] === 'OK' && typeof data[1] === 'string') {
             c.acks.get(data[1])?.(data[2] === true)

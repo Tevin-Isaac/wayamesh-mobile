@@ -43,6 +43,19 @@ export async function runDueInstructions(wallet: ethers.Wallet): Promise<Executi
 
   for (const ins of getDueInstructions(now)) {
     const amount = BigInt(ins.amount);
+    // Per-schedule end date and total cap (Arc Studio autopilot parity). A blocked schedule is paused and logged, never silently skipped.
+    if (ins.until_at > 0 && now > ins.until_at) {
+      setInstructionStatus(ins.id, 'done', 'Reached its end date');
+      logAudit({ kind: 'execution', to: ins.to_addr, amount, allowed: false, reason: `Standing payment ended: ${ins.label}` });
+      results.push({ instruction: ins, outcome: 'paused', detail: 'Reached its end date' });
+      continue;
+    }
+    if (BigInt(ins.max_total || '0') > 0n && BigInt(ins.total_paid || '0') + amount > BigInt(ins.max_total)) {
+      setInstructionStatus(ins.id, 'paused', 'Total cap reached');
+      logAudit({ kind: 'execution', to: ins.to_addr, amount, allowed: false, reason: `Total cap reached: ${ins.label}` });
+      results.push({ instruction: ins, outcome: 'paused', detail: 'Total cap reached' });
+      continue;
+    }
     const decision = evaluateAndRecord(ins.to_addr, amount);
 
     if (!decision.allowed) {
@@ -77,7 +90,8 @@ export async function runDueInstructions(wallet: ethers.Wallet): Promise<Executi
         detail: 'Signed offline — settles on reconnect',
       });
     } catch (e) {
-      // Mandate state already counted this spend (conservative: fails safe).
+      // Mandate state already counted this spend (conservative: fails safe). A PaymentBlocked here means the manual
+      // per-payment/daily limits, an unsafe recipient or a missing reserve stopped it: the schedule is paused and logged.
       const msg = e instanceof Error ? e.message : 'Signing failed';
       logAudit({ kind: 'execution', to: ins.to_addr, amount, allowed: false, reason: msg });
       setInstructionStatus(ins.id, 'paused', msg);

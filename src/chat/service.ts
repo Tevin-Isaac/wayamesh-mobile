@@ -1,24 +1,25 @@
 import { useSyncExternalStore } from 'react';
 import { Platform } from 'react-native';
-import { loadWallet } from '@/wallet/keystore';
-import { getWallet, getTransactionByHash } from '@/db/queries';
+import { getTransactionByHash } from '@/db/queries';
 import {
-  addCarried, addMessage, purgeChat, MESSAGE_TTL_MS, getContact, getMeta, getQueuedOutgoing, getUnpublishedCarried, hasMessageId,
-  markCarriedPublished, setMessageStatus, setMeta, upsertChatContact, type ChatMessage, type Contact,
+  addCarried, addMessage, addInvoice, purgeChat, MESSAGE_TTL_MS, getContact, getMeta, getQueuedOutgoing, getUnpublishedCarried, hasMessageId,
+  isBlocked, markCarriedPublished, setMessageStatus, setMeta, upsertChatContact, type ChatMessage, type Contact,
 } from '@/db/chat';
-import { decodeEnvelope, encodeEnvelope } from '@/mesh/envelope';
-import { ingestEnvelope, type IngestResult } from '@/mesh/ingest';
+import { ingestEnvelope } from '@/mesh/ingest';
+import { randomRef } from '@/mesh/voucher';
 import { bleIsAvailable, relayTransaction, requestBlePermissions, scanForPeers } from '@/mesh/ble';
+import { safeDecimal } from '@/utils/safety';
 import {
-  buildInner, buildRelayEvent, chatPubkeyOf, decodeMessageCode, encodeMessageCode, fromB64Url, openMessage,
-  sealMessage, xonlyOf, type Content, type Inner,
+  buildInner, buildRelayEvent, decodeMessageCode, encodeMessageCode, fromB64Url, isWithinRetention, MAX_RELAY_CONTENT, openBox, packInner,
+  sealBox, unpackInner, validPubkey, verifyInner, xonlyOf, MESSAGE_TTL_SECONDS, DEFAULT_RELAYS, cleanText, type Content, type Hex, type Inner,
 } from './crypto';
-import { getChatKey, getMyCard } from './identity';
-import { DEFAULT_RELAYS, RelayPool } from './relay';
+import { getSession, unlockChat } from './identity';
+import { RelayPool } from './relay';
 
-// Phone chat service: end-to-end encrypted messages over untrusted public Nostr relays.
-// Honest limits: relays keep events only for a limited time and may drop them, so a message to someone who is
-// offline is "delivered when they come online" at best. The relay subscription runs only while the app is active.
+// Phone chat service: end-to-end encrypted messages over untrusted public Nostr relays, wire-compatible with the Arc Studio
+// web wallet. The chat key is the wallet key, held in memory for the app session only (see identity.ts): relays are
+// subscribed only while the session is unlocked and the app is foregrounded.
+// Messages self-delete after 24 hours (client policy + NIP-40 tag on relay events). Contacts and payments are never purged.
 
 export const pool = new RelayPool();
 const changeListeners = new Set<() => void>();
@@ -28,35 +29,33 @@ export function onChatChange(cb: () => void): () => void {
   changeListeners.add(cb);
   return () => { changeListeners.delete(cb); };
 }
-function changed() { changeListeners.forEach((l) => l()); }
+function changed() { changeListeners.forEach((l) => { try { l(); } catch { /* a bad listener must not break chat */ } }); }
 
 export function useRelayStatus() {
   return useSyncExternalStore(pool.subscribeStatus, pool.getStatus, pool.getStatus);
 }
 
-function myAddress(): string | null {
-  return getWallet()?.address?.toLowerCase() ?? null;
-}
-
-/** Starts (or restarts) the relay subscription. Safe to call repeatedly. */
+/** Starts (or restarts) the relay subscription. Needs the unlocked session; no-ops otherwise. */
 export async function startChat(): Promise<void> {
   purgeNow();
-  const key = await getChatKey();
-  const me = myAddress();
-  if (!key || !me) return; // no wallet yet, or chat key not derived yet (derived at the first unlock)
+  const s = getSession();
+  if (!s) return;
   const now = Math.floor(Date.now() / 1000);
-  const last = Number(getMeta('chat_since') ?? 0);
-  const since = Math.max(last - 600, now - 86400);
-  pool.start(DEFAULT_RELAYS, xonlyOf(chatPubkeyOf(key)), since, (e) => {
+  const last = Math.min(Number(getMeta('chat_since') ?? 0) || 0, now);
+  const since = Math.max(last - 600, now - MESSAGE_TTL_SECONDS);
+  pool.start(DEFAULT_RELAYS, xonlyOf(s.pubkey), since, (e) => {
     void handleRelayContent(e.content).then((res) => {
-      if (res !== 'invalid') setMeta('chat_since', String(Math.max(Number(getMeta('chat_since') ?? 0), e.created_at)));
-    });
+      // The sync cursor moves only for real messages, and never past now.
+      if (res === 'delivered' || res === 'duplicate') {
+        const t = Math.min(e.created_at, Math.floor(Date.now() / 1000));
+        if (t > (Number(getMeta('chat_since') ?? 0) || 0)) setMeta('chat_since', String(t));
+      }
+    }).catch(() => undefined);
   });
-  // Flush shortly after connections open, and again when connectivity changes.
   setTimeout(() => { void flushOutbox(); }, 3000);
 }
 
-/** Purge expired/overflow chat messages. Call on start, on foreground, every 5 min while active, and when a thread opens. */
+/** Purge expired/overflow chat messages (messages only). Call on start, on foreground, every 5 min while active, and when a thread opens. */
 export function purgeNow(): void {
   try { if (purgeChat() > 0) changed(); } catch { /* DB not ready */ }
 }
@@ -67,44 +66,46 @@ export function stopChat() {
 
 // ── sending ──────────────────────────────────────────────────────────────────
 
-async function sendContent(contact: Contact, content: Content, extra: { amount?: string; txHash?: string; code?: string }): Promise<void> {
-  let key = await getChatKey();
-  const me = myAddress();
-  let card = await getMyCard();
-  if (!key || !card) {
-    // Wallets created before chat existed: one unlock (biometric) derives the chat key and signs the card.
-    await loadWallet();
-    key = await getChatKey();
-    card = await getMyCard();
-    if (key && !pool.active) void startChat();
-  }
-  if (!key || !me) throw new Error('Chat is not set up yet. Unlock your wallet once to enable it.');
-  if (!card) throw new Error('Your contact card is not ready yet. Open "My card" once.');
-  if (!contact.pubkey) throw new Error('This contact has no chat key. Ask them to share their contact card.');
-  const inner = buildInner(key, me, contact.address, content, card);
-  const box = sealMessage(inner, contact.pubkey);
-  const sealed = encodeMessageCode(contact.pubkey, box);
+async function sendContent(contact: Contact, content: Content, extra: { amount?: string; txHash?: string; code?: string; ref?: string }): Promise<void> {
+  if (!(await unlockChat())) throw new Error('Chat is locked. Authenticate to unlock it.');
+  const s = getSession();
+  if (!s) throw new Error('Chat is locked. Authenticate to unlock it.');
+  if (!contact.pubkey || !validPubkey(contact.pubkey)) throw new Error('This contact has no chat key. Ask them to share their contact card.');
+  if (content.x !== undefined && content.x.length > 500) throw new Error('Messages are limited to 500 characters.');
+  if (!pool.active) void startChat();
+  const inner = await buildInner(s.signer, contact.address as `0x${string}`, content);
+  const box = sealBox(packInner(inner), contact.pubkey as Hex);
+  const sealed = encodeMessageCode(contact.pubkey as Hex, box);
   addMessage({
-    peer: contact.address, direction: 'out', kind: content.k === 'payment' ? 'payment' : 'text',
-    body: content.x, amount: extra.amount, txHash: extra.txHash, code: extra.code,
+    peer: contact.address, direction: 'out', kind: content.k,
+    body: content.x, amount: extra.amount ?? content.a, txHash: extra.txHash, code: extra.code, ref: extra.ref ?? content.r,
+    verified: content.k === 'payment' ? true : undefined,
     status: 'queued', msgId: inner.i, sealed, sentAt: inner.t * 1000,
   });
   changed();
-  const ok = await publishSealed(sealed, contact.pubkey, inner.e);
+  const ok = await publishSealed(sealed, contact.pubkey, inner.t + MESSAGE_TTL_SECONDS);
   if (ok) { setMessageStatus(inner.i, 'sent', ['queued', 'handed']); changed(); }
-  else void trySendNearby(); // experimental, see below
+  else void trySendNearby();
 }
 
 export async function sendText(contact: Contact, text: string): Promise<void> {
   await sendContent(contact, { k: 'text', x: text }, {});
 }
 
-/** Sends the payment code of an already-signed payment (the `transactions` row) as a chat message. */
+/** Asks a contact for money: a 'request' message with amount and a fresh invoice reference. The invoice is marked paid only by a payment to me that covers it. */
+export async function sendRequest(contact: Contact, amount: string, note?: string): Promise<void> {
+  const a = safeDecimal(amount);
+  if (!a || Number(a) <= 0) throw new Error('Enter a valid amount.');
+  const ref = randomRef() as Hex;
+  await sendContent(contact, { k: 'request', a, r: ref, ...(note ? { x: note.slice(0, 500) } : {}) }, { amount: a, ref });
+  addInvoice(ref, contact.address, a);
+}
+
+/** Sends the payment code of an already-signed voucher (the `transactions` row) as a chat message. */
 export async function sendPaymentMessage(contact: Contact, txHash: string, amount: string, note?: string): Promise<void> {
   const row = getTransactionByHash(txHash);
-  if (!row) throw new Error('Payment not found.');
-  const code = encodeEnvelope(row.raw_signed);
-  await sendContent(contact, { k: 'payment', a: amount, c: code, x: note }, { amount, txHash, code });
+  if (!row || row.kind !== 'voucher') throw new Error('Only offline-reserve payments (mp2 vouchers) can travel in chat.');
+  await sendContent(contact, { k: 'payment', a: amount, c: row.raw_signed, ...(note ? { x: note.slice(0, 500) } : {}) }, { amount, txHash, code: row.raw_signed });
 }
 
 async function publishSealed(sealed: string, pubkey: string, expiresAt: number): Promise<boolean> {
@@ -114,7 +115,7 @@ async function publishSealed(sealed: string, pubkey: string, expiresAt: number):
 }
 
 let flushing = false;
-/** Sends every queued message and any sealed messages this phone is carrying for others. Relay path only. */
+/** Sends everything waiting: queued messages and sealed messages this phone is carrying for others. Relay path only. */
 export async function flushOutbox(): Promise<void> {
   if (flushing || pool.getStatus().connected === 0) return;
   flushing = true;
@@ -129,7 +130,7 @@ export async function flushOutbox(): Promise<void> {
     for (const { code, added_at } of getUnpublishedCarried()) {
       try {
         // Carried messages live at most 24h from pickup; after that they are never published.
-        const exp = added_at + 86400;
+        const exp = added_at + MESSAGE_TTL_SECONDS;
         if (exp <= Date.now() / 1000) { markCarriedPublished(code); continue; }
         const { recipientX, box } = decodeMessageCode(code);
         if ((await pool.publish(buildRelayEvent(recipientX, box, exp))) > 0) markCarriedPublished(code);
@@ -143,79 +144,83 @@ export async function flushOutbox(): Promise<void> {
 
 // ── receiving ────────────────────────────────────────────────────────────────
 
-export type BoxResult = 'delivered' | 'duplicate' | 'ack' | 'invalid' | 'dropped';
+export type BoxResult = 'delivered' | 'duplicate' | 'invalid' | 'dropped';
 
-async function handleBox(box: Uint8Array): Promise<BoxResult> {
-  const key = await getChatKey();
-  const me = myAddress();
-  if (!key || !me) return 'invalid';
-  let inner: Inner;
-  let card;
+/** Opens a sealed box addressed to this wallet, checks the sender, and stores the message. Never throws. */
+export async function handleBox(box: Uint8Array): Promise<BoxResult> {
   try {
-    ({ inner, card } = openMessage(box, key, me));
+    return await handleBoxUnsafe(box);
+  } catch {
+    return 'invalid'; // a malformed message can never crash the app
+  }
+}
+
+async function handleBoxUnsafe(box: Uint8Array): Promise<BoxResult> {
+  const s = getSession();
+  if (!s) return 'invalid'; // chat locked: nothing can be opened
+  let inner: Inner;
+  let senderPub: Hex;
+  try {
+    inner = unpackInner(openBox(box, s.privateKey));
+    senderPub = await verifyInner(inner, s.address);
   } catch {
     return 'invalid'; // not for us, tampered, or forged
   }
+  // 24h policy: older than a day, or claiming to be from more than a day ahead, is dropped.
+  if (!isWithinRetention(inner.t)) return 'dropped';
   const peer = inner.f.toLowerCase();
-  const known = getContact(peer);
-
-  // Trust: a verified card (wallet signed the chat key) can add or update a contact. Without one, the sender's
-  // chat key must match what we stored when we imported their card.
-  if (card) {
-    const rotated = !!known?.pubkey && known.pubkey !== card.pubkey;
-    upsertChatContact({
-      address: peer, name: card.name || `${peer.slice(0, 6)}…${peer.slice(-4)}`, pubkey: card.pubkey,
-      request: known ? undefined : true, verified: rotated ? false : undefined,
-    });
-  } else if (!known?.pubkey || known.pubkey !== inner.p) {
-    return 'dropped';
-  }
-
-  if (inner.k === 'ack') {
-    if (inner.x) setMessageStatus(inner.x, 'delivered', ['queued', 'handed', 'sent']);
-    changed();
-    return 'ack';
-  }
+  if (peer === s.address.toLowerCase()) return 'invalid';
+  if (isBlocked(peer)) return 'dropped';
   if (hasMessageId(inner.i)) return 'duplicate';
+
+  const known = getContact(peer);
+  if (!known) {
+    // A stranger: keep them in message requests until the user accepts. The inbox has a cap so nobody can flood it.
+    const ok = upsertChatContact({ address: peer, name: `${peer.slice(0, 6)}…${peer.slice(-4)}`, pubkey: senderPub, verified: false, request: true });
+    if (!ok) return 'dropped';
+  } else if (known.pubkey !== senderPub) {
+    upsertChatContact({ address: peer, name: known.name, pubkey: senderPub, verified: false });
+  }
 
   let status = 'received';
   let amount: string | undefined;
   let txHash: string | undefined;
   let code: string | undefined;
+  let verified: boolean | undefined;
+  let body: string | undefined = inner.x ? cleanText(inner.x, 500) : undefined;
   if (inner.k === 'payment') {
+    // Never show the amount the sender claims: the amount comes from the verified voucher, and it counts as mine only if it pays me.
     code = inner.c;
     try {
-      if (!code) throw new Error('missing code');
-      const env = decodeEnvelope(code);
-      amount = env.amount;
-      txHash = env.hash;
-      if (env.to.toLowerCase() !== me || env.from.toLowerCase() !== peer) status = 'invalid';
-    } catch {
+      if (!code) throw new Error('This message has no payment code.');
+      const res = ingestEnvelope(code, s.address, 'chat');
+      amount = res.envelope.amount;
+      txHash = res.envelope.hash;
+      if (res.role === 'courier') {
+        status = 'carried'; // not for me: held for settlement, with a clear warning in the bubble
+        verified = false;
+      } else {
+        verified = res.envelope.from.toLowerCase() === peer;
+      }
+    } catch (e) {
       status = 'invalid';
+      verified = false;
+      body = e instanceof Error ? cleanText(e.message, 200) : 'Invalid payment';
     }
+  } else if (inner.k === 'request') {
+    amount = safeDecimal(inner.a) || undefined;
   }
   const added = addMessage({
-    peer, direction: 'in', kind: inner.k === 'payment' ? 'payment' : 'text', body: inner.x, amount, txHash, code,
+    peer, direction: 'in', kind: inner.k, body, amount, txHash, code, ref: inner.r, verified,
     status, msgId: inner.i, sentAt: inner.t * 1000,
   });
   purgeChat();
   changed();
-  if (added) void sendAck(peer, inner.i);
   return added ? 'delivered' : 'duplicate';
 }
 
-async function sendAck(peer: string, id: string): Promise<void> {
-  try {
-    const c = getContact(peer);
-    const key = await getChatKey();
-    const me = myAddress();
-    if (!c?.pubkey || !key || !me || pool.getStatus().connected === 0) return;
-    const inner = buildInner(key, me, peer, { k: 'ack', x: id });
-    await pool.publish(buildRelayEvent(xonlyOf(c.pubkey), sealMessage(inner, c.pubkey).slice(), inner.e));
-  } catch { /* acks are best effort */ }
-}
-
 export async function handleRelayContent(content: string): Promise<BoxResult> {
+  if (typeof content !== 'string' || content.length > MAX_RELAY_CONTENT) return 'invalid';
   try {
     return await handleBox(fromB64Url(content));
   } catch {
@@ -224,16 +229,17 @@ export async function handleRelayContent(content: string): Promise<BoxResult> {
 }
 
 /**
- * An offline message code (mpm1:) received over Bluetooth (EXPERIMENTAL, untested on devices). If it is addressed to this
- * phone's chat key it is opened; otherwise it is kept and published to relays when this phone is next online.
+ * An offline message code (mpm1:), by scan, paste or Bluetooth. If addressed to this wallet it is opened; otherwise it is kept
+ * and published to relays when this phone is next online (the phone is a courier; only the recipient can read it).
  */
 export async function ingestMessageCode(code: string): Promise<'delivered' | 'duplicate' | 'carried' | 'invalid'> {
   try {
+    if (code.length > MAX_RELAY_CONTENT) return 'invalid';
     const { recipientX, box } = decodeMessageCode(code);
-    const key = await getChatKey();
-    if (key && recipientX === xonlyOf(chatPubkeyOf(key))) {
+    const s = getSession();
+    if (s && recipientX === xonlyOf(s.pubkey)) {
       const r = await handleBox(box);
-      return r === 'delivered' || r === 'duplicate' ? r : r === 'ack' ? 'delivered' : 'invalid';
+      return r === 'delivered' || r === 'duplicate' ? r : 'invalid';
     }
     const added = addCarried(code.trim());
     if (added) void flushOutbox();
@@ -246,19 +252,20 @@ export async function ingestMessageCode(code: string): Promise<'delivered' | 'du
 // ── payments inside chat ─────────────────────────────────────────────────────
 
 export type PaymentView =
-  | { state: 'pending-accept' }                 // received, not accepted yet
-  | { state: 'invalid' }
+  | { state: 'invalid'; reason: string }
+  | { state: 'carried'; label: string }          // a payment for someone else that this phone holds
   | { state: 'held' | 'settled' | 'failed' | 'waiting'; label: string };
 
 /** Live state of the payment behind a bubble, from the transactions table (single source of truth). */
 export function paymentView(m: ChatMessage): PaymentView {
-  if (m.status === 'invalid') return { state: 'invalid' };
+  if (m.status === 'invalid') return { state: 'invalid', reason: m.body ?? 'Not a valid payment' };
+  if (m.status === 'carried') return { state: 'carried', label: 'This payment is not for you. Your phone is only carrying it.' };
   const row = m.tx_hash ? getTransactionByHash(m.tx_hash) : null;
   if (m.direction === 'in') {
-    if (!row) return { state: 'pending-accept' };
+    if (!row) return { state: 'invalid', reason: 'Payment no longer stored' };
     if (row.status === 'settled') return { state: 'settled', label: 'Settled' };
     if (row.status === 'failed') return { state: 'failed', label: 'Settlement failed' };
-    return { state: 'held', label: 'Accepted, settles when you are online' };
+    return { state: 'held', label: m.verified ? 'Received, settles when you are online' : 'Received, but not from this contact. Check before relying on it.' };
   }
   if (!row) return { state: 'waiting', label: 'Signed' };
   if (row.status === 'settled') return { state: 'settled', label: 'Settled' };
@@ -266,22 +273,12 @@ export function paymentView(m: ChatMessage): PaymentView {
   return { state: 'waiting', label: 'Signed, waiting to settle' };
 }
 
-/** Accept a payment from a chat bubble. Same ingest path as scanning the code. */
-export function acceptChatPayment(m: ChatMessage): IngestResult {
-  if (!m.code) throw new Error('This message has no payment code.');
-  const res = ingestEnvelope(m.code, myAddress(), 'qr');
-  changed();
-  return res;
-}
-
-// ── Bluetooth hand-off (EXPERIMENTAL, untested on devices) ───────────────────
+// ── Bluetooth hand-off (Android only, EXPERIMENTAL, untested on devices) ─────
 
 let nearbyBusy = false;
 /**
- * When offline, tries to hand queued sealed messages to a nearby Wayamesh phone over BLE using the existing
- * relayTransaction() framing (the payload starts with 'mpm1:'; the receiver's peripheral routes that prefix to chat).
- * The nearby phone may be the recipient or just a courier that publishes it later. Android only, needs a native
- * build and the other phone in "Receive" mode on the Mesh tab. Result is best effort and never changes payment paths.
+ * When offline, tries to hand queued sealed messages to a nearby Wayamesh phone over BLE. Android only (the native peripheral
+ * module has no iOS implementation); on iOS this does nothing and the user relies on QR or text hand-off.
  */
 export async function trySendNearby(): Promise<number> {
   if (nearbyBusy || Platform.OS !== 'android' || !bleIsAvailable()) return 0;

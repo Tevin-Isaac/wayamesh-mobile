@@ -4,14 +4,13 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import QRCode from 'react-native-qrcode-svg';
 import * as Clipboard from 'expo-clipboard';
 import { Ionicons } from '@expo/vector-icons';
-import { getMyCard, setMyName } from '@/chat/identity';
-import { decodeCard } from '@/chat/crypto';
-import { loadWallet } from '@/wallet/keystore';
+import { myCardText, getMyName, setMyName, unlockChat } from '@/chat/identity';
+import { cleanText } from '@/chat/crypto';
 import { startChat } from '@/chat/service';
 import { COLORS, SPACING, RADIUS, FONTS } from '@/constants/theme';
 
-// "My card": the signed contact card others scan or paste to message you. Public data: it contains your wallet
-// address and your chat public key, signed by your wallet. The signature does not cover the display name.
+// "My card": the Arc Studio compatible `mpc1:` contact card others scan or paste to message you. Public data: wallet address,
+// compressed public key and a display name. The same card format works in the web wallet and the phone app.
 
 export default function MyCardScreen() {
   const [card, setCard] = useState<string | null>(null);
@@ -19,28 +18,26 @@ export default function MyCardScreen() {
   const [busy, setBusy] = useState(true);
 
   async function load() {
-    let c = await getMyCard();
-    if (!c) {
-      // Wallets created before chat existed: one unlock derives the chat key and signs the card.
-      await loadWallet();
-      c = await getMyCard();
-    }
+    // The card needs the wallet public key, which comes from the one-per-session unlock.
+    await unlockChat();
+    const c = myCardText();
     setCard(c);
-    if (c) { try { setName(decodeCard(c).name); } catch { /* ignore */ } void startChat(); }
+    setName(getMyName());
+    if (c) void startChat();
     setBusy(false);
   }
   useEffect(() => { void load(); }, []);
 
-  async function saveName() {
-    const next = await setMyName(name);
-    if (next) setCard(next);
+  function saveName() {
+    setMyName(cleanText(name, 24));
+    setCard(myCardText());
   }
 
   if (busy) return <SafeAreaView style={s.container}><ActivityIndicator color={COLORS.accent} style={{ marginTop: 80 }} /></SafeAreaView>;
   if (!card) {
     return (
       <SafeAreaView style={s.container}>
-        <Text style={[s.sub, { padding: SPACING.lg }]}>Your card is not ready. Unlock your wallet once (biometric) to create it, then reopen this screen.</Text>
+        <Text style={[s.sub, { padding: SPACING.lg }]}>Your card needs the wallet unlocked once (biometric). Go back and try again.</Text>
       </SafeAreaView>
     );
   }

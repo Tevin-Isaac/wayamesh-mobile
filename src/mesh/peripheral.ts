@@ -1,3 +1,4 @@
+import { Platform } from 'react-native';
 import WayameshBle, { isPeripheralSupported } from '../../modules/wayamesh-ble';
 import { requestBlePermissions } from './ble';
 import { encodeEnvelope, isEnvelope } from './envelope';
@@ -22,7 +23,9 @@ export async function startReceiving(
 ): Promise<() => Promise<void>> {
   const native = WayameshBle;
   if (!native || !isPeripheralSupported()) {
-    throw new Error('Bluetooth receiving is not supported on this device/build');
+    throw new Error(Platform.OS === 'ios'
+      ? 'Bluetooth hand-off is Android-only; use QR or text'
+      : 'Bluetooth receiving is not supported on this device/build');
   }
   const granted = await requestBlePermissions();
   if (!granted) throw new Error('Bluetooth permission denied');

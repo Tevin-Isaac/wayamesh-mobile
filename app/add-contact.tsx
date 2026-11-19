@@ -3,14 +3,14 @@ import { View, Text, StyleSheet, TouchableOpacity, TextInput, Alert, ScrollView,
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import * as Clipboard from 'expo-clipboard';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { ethers } from 'ethers';
 import { Avatar } from '@/components/pro';
-import { decodeCard, isCard, safetyNumber, type ContactCard } from '@/chat/crypto';
-import { getChatKey } from '@/chat/identity';
-import { chatPubkeyOf } from '@/chat/crypto';
+import { decodeCard, isCard, safetyNumber, cleanText, type ContactCard } from '@/chat/crypto';
+import { getSession, unlockChat } from '@/chat/identity';
 import { addContact, getContact, upsertChatContact } from '@/db/chat';
+import { unsafeRecipient } from '@/utils/safety';
 import { COLORS, SPACING, RADIUS, FONTS } from '@/constants/theme';
 
 // Add a contact by scanning their card QR or pasting the card text. The card is verified on import:
@@ -28,13 +28,18 @@ export default function AddContactScreen() {
   const [aName, setAName] = useState('');
   const [aAddr, setAAddr] = useState('');
   const [aPhone, setAPhone] = useState('');
+  const { card: cardParam } = useLocalSearchParams<{ card?: string }>();
+  // A card scanned from the main scanner arrives as a param: show the confirm screen straight away.
+  useEffect(() => { if (typeof cardParam === 'string' && cardParam) void accept(cardParam); }, [cardParam]);
 
   // Save by address only: no chat key needed, payments work. Chat starts once their card is added.
   function saveByAddress() {
     const a = aAddr.trim();
     if (!ethers.isAddress(a)) { Alert.alert('Invalid address', 'Enter a valid 0x wallet address'); return; }
-    if (!aName.trim()) { Alert.alert('Name required', 'Give this contact a name'); return; }
-    addContact(ethers.getAddress(a), aName, aPhone);
+    if (!cleanText(aName, 24)) { Alert.alert('Name required', 'Give this contact a name'); return; }
+    const unsafe = unsafeRecipient(a);
+    if (unsafe) { Alert.alert('Cannot add this address', unsafe); return; }
+    try { addContact(ethers.getAddress(a), aName, aPhone); } catch (e) { Alert.alert('Cannot add', e instanceof Error ? e.message : 'Try again'); return; }
     router.replace({ pathname: '/chat-thread', params: { peer: a.toLowerCase(), name: aName.trim() } });
   }
 
@@ -47,11 +52,14 @@ export default function AddContactScreen() {
     if (!isCard(text)) { Alert.alert('Not a contact card', 'Scan or paste a card that starts with mpc1:'); return; }
     try {
       const c = decodeCard(text);
+      const unsafe = unsafeRecipient(c.address);
+      if (unsafe) { Alert.alert('Card rejected', unsafe); return; }
       locked.current = true;
       Vibration.vibrate(60);
-      const mine = await getChatKey();
-      setSafety(mine ? safetyNumber(chatPubkeyOf(mine), c.pubkey) : '');
-      setCard({ ...c, address: ethers.getAddress(c.address) });
+      await unlockChat(); // one biometric per session; needed only to show the safety number
+      const mine = getSession()?.pubkey;
+      setSafety(mine ? safetyNumber(mine, c.pubkey) : '');
+      setCard(c); // decodeCard already returns the checksummed address
       setName(getContact(c.address)?.name ?? c.name);
     } catch (e) {
       Alert.alert('Card rejected', e instanceof Error ? e.message : 'Invalid card');
@@ -60,7 +68,8 @@ export default function AddContactScreen() {
 
   function save() {
     if (!card) return;
-    upsertChatContact({ address: card.address, name: name.trim() || `${card.address.slice(0, 6)}…${card.address.slice(-4)}`, pubkey: card.pubkey, request: false });
+    const ok = upsertChatContact({ address: card.address, name: cleanText(name, 24) || `${card.address.slice(0, 6)}…${card.address.slice(-4)}`, pubkey: card.pubkey, request: false });
+    if (!ok) { Alert.alert('Contact limit reached', 'Remove a contact before adding more.'); return; }
     router.replace({ pathname: '/chat-thread', params: { peer: card.address.toLowerCase() } });
   }
 
@@ -70,14 +79,15 @@ export default function AddContactScreen() {
         <ScrollView contentContainerStyle={s.pad}>
           <View style={s.center}>
             <Avatar seed={name || card.address} size={72} />
-            <Text style={s.addr}>{card.address}</Text>
+            <Text style={s.addrFull}>{card.address}</Text>
+            <Text style={s.fine}>Check the FULL address above against what they told you. A name can be faked; an address cannot.</Text>
           </View>
           <Text style={s.label}>Name</Text>
-          <TextInput style={s.input} value={name} onChangeText={setName} placeholder="Contact name" placeholderTextColor={COLORS.textDim} />
+          <TextInput style={s.input} value={name} onChangeText={(t) => setName(cleanText(t, 24))} maxLength={24} placeholder="Contact name" placeholderTextColor={COLORS.textDim} />
           <View style={s.note}>
             <Ionicons name="shield-checkmark-outline" size={18} color={COLORS.accent} />
             <Text style={s.noteText}>
-              This card is signed by the wallet above, so the chat key really belongs to it.
+              This card carries the public key of the wallet above, and the address is checked against that key. Names on cards are not verified.
               {safety ? ' To be sure nobody swapped the card, compare this number with theirs:' : ''}
             </Text>
           </View>
@@ -148,6 +158,7 @@ const s = StyleSheet.create({
   center: { alignItems: 'center', gap: SPACING.sm, marginVertical: SPACING.md },
   label: { color: COLORS.textMuted, fontSize: 12, marginTop: SPACING.md },
   input: { backgroundColor: COLORS.surfaceAlt, borderWidth: 1, borderColor: COLORS.border, borderRadius: RADIUS.md, paddingHorizontal: SPACING.md, paddingVertical: 12, color: COLORS.text, fontSize: 14 },
+  addrFull: { fontFamily: FONTS.mono, fontSize: 12, color: COLORS.text, textAlign: 'center', lineHeight: 18 },
   addr: { fontFamily: FONTS.mono, fontSize: 11, color: COLORS.textMuted, textAlign: 'center' },
   note: { flexDirection: 'row', gap: 8, backgroundColor: COLORS.accentSoft, borderRadius: RADIUS.md, padding: SPACING.md, marginTop: SPACING.md },
   noteText: { flex: 1, color: COLORS.textMuted, fontSize: 12, lineHeight: 18 },

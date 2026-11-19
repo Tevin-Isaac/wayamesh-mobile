@@ -17,6 +17,8 @@ import { syncIncoming } from '@/wallet/sync';
 import { getWallet } from '@/db/queries';
 import { getPreferences } from '@/utils/preferences';
 import { startChat, stopChat, flushOutbox, purgeNow } from '@/chat/service';
+import { lockChat, purgeLegacyChatKey, isChatUnlocked } from '@/chat/identity';
+import { ErrorBoundary } from '@/components/ErrorBoundary';
 import i18n from '@/i18n';
 import { COLORS } from '@/constants/theme';
 
@@ -43,6 +45,7 @@ export default function RootLayout() {
   useEffect(() => {
     async function bootstrap() {
       await initDatabase();
+      void purgeLegacyChatKey(); // the previous design's unprotected chat key must not linger
       // Load persisted language preference
       try {
         const prefs = getPreferences();
@@ -141,9 +144,10 @@ export default function RootLayout() {
   useEffect(() => {
     if (!dbReady) return;
     purgeNow(); // chat messages self-delete after 24h
-    void startChat(); // no-ops until a wallet and its chat key exist; the Chats tab retries on focus
+    void startChat(); // no-ops until chat is unlocked (one biometric when the user opens Chats, sends or pays)
     const sub = AppState.addEventListener('change', (next) => {
-      if (next === 'active') { purgeNow(); void startChat(); } else stopChat();
+      if (next === 'active') { purgeNow(); if (isChatUnlocked()) void startChat(); }
+      else if (next === 'background') { stopChat(); lockChat(); } // leaving the foreground stops relays and wipes the in-memory chat key; not on 'inactive' (the iOS Face ID prompt causes it)
     });
     const timer = setInterval(() => { if (AppState.currentState === 'active') void flushOutbox(); }, 30_000);
     const purgeTimer = setInterval(() => { if (AppState.currentState === 'active') purgeNow(); }, 5 * 60_000);
@@ -158,6 +162,7 @@ export default function RootLayout() {
   return (
     <I18nextProvider i18n={i18n}>
     <SafeAreaProvider>
+      <ErrorBoundary>
       <StatusBar style="light" backgroundColor={COLORS.bg} />
       <Stack screenOptions={{ headerShown: false }}>
         <Stack.Screen name="onboarding" options={{ animation: 'none' }} />
@@ -239,10 +244,23 @@ export default function RootLayout() {
           options={{ presentation: 'modal', headerTitle: 'Offline reserve', ...MODAL_HEADER }}
         />
         <Stack.Screen
+          name="limits"
+          options={{ presentation: 'modal', headerTitle: 'Limits', ...MODAL_HEADER }}
+        />
+        <Stack.Screen
+          name="security"
+          options={{ presentation: 'modal', headerTitle: 'What is protected', ...MODAL_HEADER }}
+        />
+        <Stack.Screen
+          name="requests"
+          options={{ presentation: 'modal', headerTitle: 'Message requests', ...MODAL_HEADER }}
+        />
+        <Stack.Screen
           name="ramp"
           options={{ presentation: 'modal', headerTitle: 'Add money', ...MODAL_HEADER }}
         />
       </Stack>
+      </ErrorBoundary>
     </SafeAreaProvider>
     </I18nextProvider>
   );

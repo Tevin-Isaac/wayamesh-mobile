@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import {
-  View, Text, FlatList, StyleSheet, TouchableOpacity, Switch, Alert, ActivityIndicator,
+  View, Text, FlatList, StyleSheet, TouchableOpacity, Switch, Alert, ActivityIndicator, Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -201,7 +201,9 @@ export default function MeshScreen() {
                     ? 'Discoverable — nearby phones can hand you payments'
                     : canReceive
                       ? 'Turn on to accept offline payments from nearby phones'
-                      : 'Not supported in this build — update the app'}
+                      : Platform.OS === 'ios'
+                        ? 'Bluetooth hand-off is Android-only; use QR or text'
+                        : 'Not supported in this build — update the app'}
                 </Text>
               </View>
               <Switch

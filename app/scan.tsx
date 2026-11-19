@@ -6,6 +6,10 @@ import { ethers } from 'ethers';
 import * as Clipboard from 'expo-clipboard';
 import { Ionicons } from '@expo/vector-icons';
 import { isEnvelope } from '@/mesh/envelope';
+import { parseRequest } from '@/mesh/request';
+import { isCard, isMessageCode } from '@/chat/crypto';
+import { ingestMessageCode } from '@/chat/service';
+import { unlockChat } from '@/chat/identity';
 import { COLORS } from '@/constants/theme';
 
 export default function ScanScreen() {
@@ -24,7 +28,7 @@ export default function ScanScreen() {
   async function pasteCode() {
     const text = (await Clipboard.getStringAsync()).trim();
     if (!text) { Alert.alert('Nothing to paste', 'Copy a payment code (starts with mp2:) first.'); return; }
-    if (!isEnvelope(text) && !ethers.isAddress(text)) {
+    if (!isEnvelope(text) && !ethers.isAddress(text) && !isCard(text) && !isMessageCode(text) && !parseRequest(text)) {
       Alert.alert('Not a payment code', 'The copied text is not a Wayamesh payment code or address.');
       return;
     }
@@ -39,6 +43,35 @@ export default function ScanScreen() {
       setScanned(true);
       Vibration.vibrate(60);
       router.replace({ pathname: '/receive-payment', params: { payload: data.trim() } });
+      return;
+    }
+
+    // Contact card (mpc1:), offline chat message (mpm1:) and payment-request links (meshpay:), same formats as the web wallet.
+    if (isCard(data)) {
+      setScanned(true);
+      Vibration.vibrate(60);
+      router.replace({ pathname: '/add-contact', params: { card: data.trim() } });
+      return;
+    }
+    if (isMessageCode(data)) {
+      setScanned(true);
+      Vibration.vibrate(60);
+      void (async () => {
+        await unlockChat();
+        const r = await ingestMessageCode(data.trim());
+        Alert.alert(
+          r === 'delivered' ? 'Message received' : r === 'carried' ? 'Carrying a message' : r === 'duplicate' ? 'Already received' : 'Could not open',
+          r === 'carried' ? 'It is not for you. Your phone will pass it on when it is online. Only the recipient can read it.' : r === 'invalid' ? 'That message could not be opened.' : 'Open Chats to read it.',
+          [{ text: 'OK', onPress: () => router.back() }],
+        );
+      })();
+      return;
+    }
+    const req = parseRequest(data);
+    if (req) {
+      setScanned(true);
+      Vibration.vibrate(60);
+      router.replace({ pathname: '/send', params: { scannedAddress: req.address, amount: req.amount ?? '', ref: req.ref ?? '' } });
       return;
     }
 

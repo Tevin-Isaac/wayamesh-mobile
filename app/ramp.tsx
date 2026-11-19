@@ -11,6 +11,13 @@ import { Eyebrow } from '@/components/pro';
 import { getRampConfig, buildBuyUrl, FAUCET_URL } from '@/constants/ramp';
 import { ACTIVE_CHAIN } from '@/constants/chain';
 import { withRpc } from '@/wallet/rpc';
+import { sendPayment } from '@/wallet/pay';
+import { settleVoucher } from '@/wallet/meshpay';
+import { getCachedReserve } from '@/wallet/meshpay';
+import { checkLimits } from '@/wallet/limits';
+import { saveTransaction, getTransactionByHash, updateTransactionStatus } from '@/db/queries';
+import { decodeVoucher, DEFAULT_FEE_UNITS, formatUsdc as fmtUnits, parseUsdc } from '@/mesh/voucher';
+import { unsafeRecipient } from '@/utils/safety';
 import {
   isRampConfigured, getConfig, startOnramp, startOfframp, pollOrder, normalizePhone,
   previewUsdcForKes, previewKesForUsdc, type RampServerConfig, type RampOrder,
@@ -139,10 +146,16 @@ function CashOut({ cfg, address, balance, unlock, onDone }: { cfg: RampServerCon
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [order, setOrder] = useState<RampOrder | null>(null);
+  const [fromReserve, setFromReserve] = useState(false);
   const cancel = useRef({ cancelled: false });
   useEffect(() => () => { cancel.current.cancelled = true; }, []);
+  // Reserve cash out is offered only when the server says it can verify MeshPay settlements (/api/ramp/config -> meshpay).
+  const reserveOk = !!cfg.meshpay;
+  const reserveAvail = address ? Number(getCachedReserve(address)?.amount ?? 0) : 0;
 
-  const max = Math.max(0, Math.floor(((Number(balance) || 0) - GAS_BUFFER) * 1e6) / 1e6);
+  const max = fromReserve
+    ? Math.max(0, Math.floor((reserveAvail - Number(fmtUnits(DEFAULT_FEE_UNITS))) * 1e6) / 1e6)
+    : Math.max(0, Math.floor(((Number(balance) || 0) - GAS_BUFFER) * 1e6) / 1e6);
   const usdcNum = Number(amount);
   const validAmt = /^\d+(\.\d{1,6})?$/.test(amount) && usdcNum > 0 && usdcNum <= max;
   const kesOut = validAmt ? previewKesForUsdc(cfg, usdcNum) : 0;
@@ -158,13 +171,34 @@ function CashOut({ cfg, address, balance, unlock, onDone }: { cfg: RampServerCon
       const wallet = await unlock();
       if (!wallet) throw new Error('Wallet locked');
       const treasury = cfg.treasury;
-      const hash = await withRpc(async (p) => {
-        const tx = await wallet.connect(p).sendTransaction({ to: treasury, value: ethers.parseUnits(amount, ACTIVE_CHAIN.usdc.decimals) });
-        await tx.wait(1);
-        return tx.hash;
-      });
+      const unsafe = unsafeRecipient(treasury);
+      if (unsafe) throw new Error(unsafe);
+      let hash: string;
+      let deposit: 'native' | 'voucher' = 'native';
+      if (fromReserve && reserveOk) {
+        // Pay the treasury from the offline reserve with a signed voucher (counts against spending limits), settle it on
+        // chain from this phone, then give the server the settlement tx hash. This is the web wallet's reserve cash out.
+        const signed = await sendPayment(wallet, treasury, amount, { voucherOnly: true });
+        const row = getTransactionByHash(signed.hash);
+        if (!row) throw new Error('Payment not stored.');
+        const outcome = await settleVoucher(wallet, decodeVoucher(row.raw_signed));
+        if (outcome.status !== 'settled') throw new Error('Could not settle the payment to the treasury right now. It stays queued; try again when online.');
+        updateTransactionStatus(signed.hash, 'settled', outcome.txHash);
+        hash = outcome.txHash;
+        deposit = 'voucher';
+      } else {
+        const blocked = checkLimits(parseUsdc(amount), wallet.address);
+        if (blocked) throw new Error(blocked);
+        hash = await withRpc(async (p) => {
+          const tx = await wallet.connect(p).sendTransaction({ to: treasury, value: ethers.parseUnits(amount, ACTIVE_CHAIN.usdc.decimals) });
+          await tx.wait(1);
+          return tx.hash;
+        });
+        // Record the cash out so it counts against the daily limit.
+        saveTransaction({ hash, from_address: wallet.address, to_address: treasury, amount, status: 'settled', raw_signed: '0x', kind: 'transfer' });
+      }
       setOrder({ id: '', kind: 'offramp', status: 'paid', usdc: amount, kes: kesOut, phoneMasked: '', txHash: undefined, mock: cfg.mock });
-      const r = await startOfframp(wallet, phone, amount, hash);
+      const r = await startOfframp(wallet, phone, amount, hash, deposit);
       setOrder((o) => ({ ...(o as RampOrder), id: r.id, status: r.status }));
       const final = await pollOrder(r.id, setOrder, { signal: cancel.current });
       if (final.status === 'completed' || final.status === 'failed') onDone();
@@ -179,8 +213,13 @@ function CashOut({ cfg, address, balance, unlock, onDone }: { cfg: RampServerCon
     <View style={styles.form}>
       <Field label="M-Pesa number" value={phone} onChangeText={setPhone} placeholder="0712 345 678" keyboardType="phone-pad" prefix="+254" />
       <Field label="Amount (USDC)" value={amount} onChangeText={setAmount} placeholder="0.00" keyboardType="decimal-pad" />
+      {reserveOk ? (
+        <TouchableOpacity onPress={() => setFromReserve((v) => !v)} activeOpacity={0.7}>
+          <Text style={styles.maxLink}>{fromReserve ? 'Paying from offline reserve (tap for wallet balance)' : 'Paying from wallet balance (tap to use offline reserve)'}</Text>
+        </TouchableOpacity>
+      ) : null}
       <TouchableOpacity onPress={() => setAmount(max.toString())}>
-        <Text style={styles.maxLink}>Max withdrawable: {max.toFixed(2)} USDC (keeps {GAS_BUFFER} for gas)</Text>
+        <Text style={styles.maxLink}>Max withdrawable: {max.toFixed(2)} USDC{fromReserve ? ' (reserve, after courier fee)' : ` (keeps ${GAS_BUFFER} for gas)`}</Text>
       </TouchableOpacity>
       <View style={styles.preview}>
         <Text style={styles.previewLabel}>You receive (approx.)</Text>

@@ -12,8 +12,10 @@ import { sendPayment, planPayment, type PayMode } from '@/wallet/pay';
 import { Avatar } from '@/components/pro';
 import { getContacts, getContact, type Contact } from '@/db/chat';
 import { COLORS, SPACING, RADIUS, FONTS } from '@/constants/theme';
+import { groupAddress, lookalike, safeDecimal, unsafeRecipient } from '@/utils/safety';
+import { VOUCHER_TTL_SECONDS } from '@/mesh/voucher';
 
-type Phase = 'entry' | 'signing' | 'relaying' | 'done';
+type Phase = 'entry' | 'review' | 'signing' | 'relaying' | 'done';
 const RESERVE = 0.0001; // tiny gas reserve
 
 const KEYS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '.', '0', 'del'] as const;
@@ -34,7 +36,9 @@ function Keypad({ onKey }: { onKey: (k: string) => void }) {
 
 export default function SendScreen() {
   const { address, balance, unlock } = useWallet();
-  const { scannedAddress } = useLocalSearchParams<{ scannedAddress?: string }>();
+  const { scannedAddress, amount: presetAmount, ref: presetRef } = useLocalSearchParams<{ scannedAddress?: string; amount?: string; ref?: string }>();
+  // A payment request from chat prefills the amount and carries its invoice reference inside the signed voucher.
+  const invoiceRef = typeof presetRef === 'string' && /^0x[0-9a-fA-F]{64}$/.test(presetRef) ? presetRef : undefined;
 
   const [to, setTo] = useState('');
   const [amt, setAmt] = useState('');
@@ -45,6 +49,7 @@ export default function SendScreen() {
   const [sentMode, setSentMode] = useState<PayMode>('direct');
 
   useEffect(() => { if (scannedAddress) setTo(scannedAddress); }, [scannedAddress]);
+  useEffect(() => { if (presetAmount && safeDecimal(presetAmount)) setAmt(presetAmount); }, [presetAmount]);
   useEffect(() => { try { setContacts(getContacts()); } catch { /* db not ready */ } }, []);
 
   const validTo = ethers.isAddress(to);
@@ -56,7 +61,9 @@ export default function SendScreen() {
   // Voucher mode spends from the offline reserve; otherwise from the wallet balance.
   const available = plan.mode === 'voucher' ? reserveNum - feeNum : bal - RESERVE;
   const insufficient = num > available && num > 0;
-  const ready = num > 0 && !insufficient && validTo;
+  const unsafe = validTo ? unsafeRecipient(to) : null;
+  const similar = validTo ? lookalike(to, contacts.map((c) => c.address)) : null;
+  const ready = num > 0 && !insufficient && validTo && !unsafe;
 
   function key(k: string) {
     setError('');
@@ -72,12 +79,13 @@ export default function SendScreen() {
 
   async function go() {
     if (!ready) return;
+    if (phase === 'entry') { setPhase('review'); return; } // review before signing
     setPhase('signing');
     setError('');
     try {
       const wallet = await unlock();
       if (!wallet) { setPhase('entry'); return; }
-      const res = await sendPayment(wallet, to, amt);
+      const res = await sendPayment(wallet, to, amt, { ref: invoiceRef });
       setSentMode(res.mode);
       setTxHash(res.hash);
       setPhase('relaying');
@@ -86,6 +94,48 @@ export default function SendScreen() {
       setError(e instanceof Error ? e.message : 'Send failed');
       setPhase('entry');
     }
+  }
+
+  if (phase === 'review') {
+    const contact = getContact(to);
+    const expiry = new Date(Date.now() + VOUCHER_TTL_SECONDS * 1000);
+    return (
+      <SafeAreaView style={styles.container} edges={['bottom']}>
+        <View style={styles.header}>
+          <TouchableOpacity onPress={() => setPhase('entry')} activeOpacity={0.7}><Ionicons name="chevron-back" size={24} color={COLORS.textMuted} /></TouchableOpacity>
+          <Text style={styles.headerTitle}>Review before signing</Text>
+          <View style={{ width: 24 }} />
+        </View>
+        <ScrollView contentContainerStyle={{ gap: SPACING.md, paddingBottom: SPACING.lg }}>
+          <View style={styles.toCard}>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.toLabel}>TO {contact ? `· ${contact.name}` : '· NOT IN YOUR CONTACTS'}</Text>
+              <Text style={styles.reviewAddr}>{groupAddress(ethers.getAddress(to))}</Text>
+              <Text style={styles.reviewNote}>Check every group against what the recipient told you.</Text>
+            </View>
+          </View>
+          {similar ? (
+            <View style={styles.warnBox}>
+              <Text style={styles.warnText}>Look-alike address. This is NOT your saved contact, but it starts and ends the same as {similar}. This is a common scam. Go back unless you are sure.</Text>
+            </View>
+          ) : null}
+          <View style={styles.toCard}>
+            <View style={{ flex: 1, gap: 6 }}>
+              <Text style={styles.reviewRow}>Amount: ${num.toFixed(2)} USDC</Text>
+              <Text style={styles.reviewRow}>{plan.mode === 'voucher' ? `Courier fee: $${plan.fee} (paid from your reserve to whoever settles it)` : 'Courier fee: none (plain transfer from your wallet)'}</Text>
+              <Text style={styles.reviewRow}>{plan.mode === 'voucher' ? `Valid until ${expiry.toLocaleString()}` : 'Settles when a phone is online'}</Text>
+              {invoiceRef ? <Text style={styles.reviewNote}>Pays invoice {invoiceRef.slice(0, 10)}...</Text> : null}
+              <Text style={styles.reviewNote}>Offline payments are provisional until they settle. Only pay people you would trust with this amount.</Text>
+            </View>
+          </View>
+          {!!error && <Text style={styles.amountError}>{error}</Text>}
+        </ScrollView>
+        <TouchableOpacity style={styles.cta} onPress={go} activeOpacity={0.85}>
+          <Ionicons name="lock-closed" size={16} color={COLORS.bg} />
+          <Text style={styles.ctaText}>Confirm and sign</Text>
+        </TouchableOpacity>
+      </SafeAreaView>
+    );
   }
 
   if (phase !== 'entry') {
@@ -153,6 +203,7 @@ export default function SendScreen() {
             : `USDC · ${bal.toFixed(2)} in wallet${reserveNum > 0 ? ' (reserve too low for this amount)' : ''}`}
         </Text>
         {insufficient && <Text style={styles.amountError}>Insufficient balance</Text>}
+        {!!unsafe && <Text style={styles.amountError}>{unsafe}</Text>}
         {!!error && <Text style={styles.amountError}>{error}</Text>}
       </View>
 
@@ -165,7 +216,7 @@ export default function SendScreen() {
         activeOpacity={0.85}
       >
         <Ionicons name="lock-closed" size={16} color={COLORS.bg} />
-        <Text style={styles.ctaText}>{plan.mode === 'voucher' ? 'Sign offline voucher' : 'Sign offline & send'}</Text>
+        <Text style={styles.ctaText}>Review</Text>
       </TouchableOpacity>
     </SafeAreaView>
   );
@@ -274,6 +325,11 @@ const styles = StyleSheet.create({
   },
   chipName: { fontSize: 13, color: COLORS.text, fontWeight: '500', maxWidth: 110 },
 
+  reviewAddr: { fontFamily: FONTS.mono, fontSize: 15, color: COLORS.text, lineHeight: 24, marginTop: 4 },
+  reviewRow: { color: COLORS.text, fontSize: 14 },
+  reviewNote: { color: COLORS.textDim, fontSize: 12, lineHeight: 18, marginTop: 4 },
+  warnBox: { backgroundColor: COLORS.warningSoft, borderWidth: 1, borderColor: COLORS.warning, borderRadius: RADIUS.md, padding: SPACING.md },
+  warnText: { color: COLORS.warning, fontSize: 13, lineHeight: 19 },
   amountArea: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   amountRow: { flexDirection: 'row', alignItems: 'baseline' },
   amountSymbol: { fontFamily: FONTS.mono, fontSize: 30, color: COLORS.textMuted, marginRight: 4 },

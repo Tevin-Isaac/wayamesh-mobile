@@ -5,6 +5,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useState, useEffect } from 'react';
 import { router } from 'expo-router';
+import Constants from 'expo-constants';
 import { Ionicons } from '@expo/vector-icons';
 import { Avatar, Eyebrow } from '@/components/pro';
 import { Badge } from '@/components/ui/Badge';
@@ -125,6 +126,10 @@ export default function SettingsScreen() {
           <Row icon="key-outline" label="Recovery phrase" chevron onPress={() => router.push('/backup')} />
           <HR />
           <Row icon="people-outline" label="Guardian recovery" chevron onPress={() => router.push('/guardian-setup')} />
+          <HR />
+          <Row icon="speedometer-outline" label="Limits" value="Spending and accept" chevron onPress={() => router.push('/limits')} />
+          <HR />
+          <Row icon="shield-checkmark-outline" label="What is protected" chevron onPress={() => router.push('/security')} />
         </View>
 
         <Eyebrow style={styles.eyebrow}>Recovery</Eyebrow>
@@ -165,7 +170,7 @@ export default function SettingsScreen() {
         <TouchableOpacity style={styles.signOut} onPress={confirmLogout} activeOpacity={0.85}>
           <Text style={styles.signOutText}>Sign Out</Text>
         </TouchableOpacity>
-        <Text style={styles.about}>Wayamesh · v1.0.0 · Built on Arc</Text>
+        <Text style={styles.about}>Wayamesh · v{Constants.expoConfig?.version ?? '?'} · Built on Arc · Testnet</Text>
       </ScrollView>
 
       {/* language picker */}

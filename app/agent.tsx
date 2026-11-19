@@ -22,6 +22,7 @@ import { useWallet } from '@/hooks/useWallet';
 import { Avatar, Eyebrow } from '@/components/pro';
 import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
+import { requireReauth } from '@/utils/reauth';
 import { COLORS, SPACING, RADIUS, FONTS } from '@/constants/theme';
 
 const usdc = (units: bigint) => ethers.formatUnits(units, 6);
@@ -121,6 +122,8 @@ export default function AgentScreen() {
   const [payTo, setPayTo]       = useState('');
   const [payAmt, setPayAmt]     = useState('');
   const [cadence, setCadence]   = useState<(typeof CADENCES)[number]['key']>('once');
+  const [untilDays, setUntilDays] = useState('');
+  const [maxTotalAmt, setMaxTotalAmt] = useState('');
   const [contacts, setContacts] = useState<Contact[]>([]);
 
   // Guardrail test form
@@ -137,8 +140,10 @@ export default function AgentScreen() {
 
   useEffect(() => { refresh(); }, [refresh]);
 
-  function grant() {
+  async function grant() {
     try {
+      // Granting or raising a mandate loosens protection, so it needs a fresh biometric/passcode check.
+      if (!(await requireReauth('Confirm the agent mandate'))) { Alert.alert('Not granted', 'The mandate needs your biometrics or device passcode.'); return; }
       const addresses = allow.split(/[\s,]+/).map((a) => a.trim()).filter(Boolean);
       for (const a of addresses) {
         if (!ethers.isAddress(a)) throw new Error(`Invalid address: ${a}`);
@@ -179,7 +184,11 @@ export default function AgentScreen() {
     }
     const label = payLabel.trim() || getContact(payTo.toLowerCase())?.name || 'Standing payment';
     const secs = CADENCES.find((c) => c.key === cadence)!.secs;
-    addInstruction({ label, to: payTo, amount, intervalSeconds: secs });
+    let maxTotal = 0n;
+    if (maxTotalAmt.trim()) { try { maxTotal = toUnits(maxTotalAmt); } catch { Alert.alert('Invalid total cap', 'Enter a USDC amount or leave empty.'); return; } }
+    const untilAt = Number(untilDays) > 0 ? Math.floor(Date.now() / 1000) + Number(untilDays) * 86_400 : 0;
+    addInstruction({ label, to: payTo, amount, intervalSeconds: secs, untilAt, maxTotal });
+    setUntilDays(''); setMaxTotalAmt('');
     setPayLabel(''); setPayTo(''); setPayAmt(''); setCadence('once'); setShowForm(false);
     refresh();
   }
@@ -311,6 +320,8 @@ export default function AgentScreen() {
                       </TouchableOpacity>
                     ))}
                   </View>
+                  <Input label="Stop after (days, optional)" value={untilDays} onChangeText={setUntilDays} keyboardType="number-pad" containerStyle={styles.field} />
+                  <Input label="Max total for this schedule (USDC, optional)" value={maxTotalAmt} onChangeText={setMaxTotalAmt} keyboardType="decimal-pad" containerStyle={styles.field} />
                   <Button title="Create standing payment" onPress={createInstruction} style={styles.field} />
                   <Text style={styles.hint}>First run is due immediately — tap “Run now” to execute, even with no connection.</Text>
                 </View>

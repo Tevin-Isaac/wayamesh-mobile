@@ -23,6 +23,12 @@ export interface Instruction {
   last_run_at: number;
   last_tx_hash: string | null;
   created_at: number;
+  /** Unix seconds after which the schedule stops (0 = no end). */
+  until_at: number;
+  /** Cap on the total this schedule may pay, USDC base units (0 = no cap). */
+  max_total: string;
+  /** Total paid so far by this schedule, base units. */
+  total_paid: string;
 }
 
 function ensureTable(): void {
@@ -42,6 +48,13 @@ function ensureTable(): void {
       created_at       INTEGER NOT NULL
     );
   `);
+  for (const sql of [
+    'ALTER TABLE agent_instructions ADD COLUMN until_at INTEGER NOT NULL DEFAULT 0',
+    "ALTER TABLE agent_instructions ADD COLUMN max_total TEXT NOT NULL DEFAULT '0'",
+    "ALTER TABLE agent_instructions ADD COLUMN total_paid TEXT NOT NULL DEFAULT '0'",
+  ]) {
+    try { getDb().execSync(sql); } catch { /* column already exists */ }
+  }
 }
 
 export function addInstruction(i: {
@@ -50,14 +63,16 @@ export function addInstruction(i: {
   amount: bigint;
   intervalSeconds: number;
   firstRunAt?: number;
+  untilAt?: number;
+  maxTotal?: bigint;
 }): void {
   ensureTable();
   const now = Math.floor(Date.now() / 1000);
   getDb().runSync(
     `INSERT INTO agent_instructions
-       (label, to_addr, amount, interval_seconds, next_run_at, status, created_at)
-     VALUES (?, ?, ?, ?, ?, 'active', ?)`,
-    [i.label, i.to.toLowerCase(), i.amount.toString(), i.intervalSeconds, i.firstRunAt ?? now, now],
+       (label, to_addr, amount, interval_seconds, next_run_at, status, created_at, until_at, max_total)
+     VALUES (?, ?, ?, ?, ?, 'active', ?, ?, ?)`,
+    [i.label, i.to.toLowerCase(), i.amount.toString(), i.intervalSeconds, i.firstRunAt ?? now, now, i.untilAt ?? 0, (i.maxTotal ?? 0n).toString()],
   );
 }
 
@@ -101,12 +116,15 @@ export function recordRun(id: number, txHash: string, now = Math.floor(Date.now(
   ensureTable();
   const row = getDb().getFirstSync<Instruction>('SELECT * FROM agent_instructions WHERE id = ?', [id]);
   if (!row) return;
-  const recurring = row.interval_seconds > 0;
+  const paid = BigInt(row.total_paid || '0') + BigInt(row.amount);
+  const capHit = BigInt(row.max_total || '0') > 0n && paid + BigInt(row.amount) > BigInt(row.max_total);
+  const ended = row.until_at > 0 && now + row.interval_seconds > row.until_at;
+  const recurring = row.interval_seconds > 0 && !capHit && !ended;
   getDb().runSync(
     `UPDATE agent_instructions
        SET runs_count = runs_count + 1, last_run_at = ?, last_tx_hash = ?,
-           next_run_at = ?, status = ?, status_reason = ''
+           next_run_at = ?, status = ?, status_reason = '', total_paid = ?
      WHERE id = ?`,
-    [now, txHash, recurring ? now + row.interval_seconds : row.next_run_at, recurring ? 'active' : 'done', id],
+    [now, txHash, recurring ? now + row.interval_seconds : row.next_run_at, recurring ? 'active' : 'done', paid.toString(), id],
   );
 }

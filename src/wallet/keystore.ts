@@ -3,7 +3,6 @@ import * as LocalAuthentication from 'expo-local-authentication';
 import { ethers } from 'ethers';
 import { saveWallet, getWallet, type WalletRow } from '@/db/queries';
 import { getPreferences, setBiometric } from '@/utils/preferences';
-import { ensureChatIdentity, clearChatIdentity } from '@/chat/identity';
 
 const KEY_STORE_KEY = 'wayamesh_encrypted_pk';
 const MNEMONIC_KEY  = 'wayamesh_mnemonic';
@@ -64,15 +63,12 @@ async function persistSecrets(privateKey: string, mnemonic: string | null): Prom
     else          await SecureStore.deleteItemAsync(MNEMONIC_KEY);
   }
   await SecureStore.setItemAsync(PRESENT_KEY, '1', BASE_OPTS);
-  await ensureChatIdentity(privateKey); // derive the separate chat key + signed contact card while the key is in hand
 }
 
 /** Read the private key, prompting OS biometric if the key is auth-bound. */
 export async function readPrivateKey(prompt: string): Promise<string | null> {
   try {
-    const pk = await SecureStore.getItemAsync(KEY_STORE_KEY, readOpts(prompt));
-    if (pk) await ensureChatIdentity(pk); // no-op once the chat key exists
-    return pk;
+    return await SecureStore.getItemAsync(KEY_STORE_KEY, readOpts(prompt));
   } catch {
     return null; // user cancelled / failed OS auth
   }
@@ -247,7 +243,10 @@ export async function deleteWallet(): Promise<void> {
   await SecureStore.deleteItemAsync(KEY_STORE_KEY);
   await SecureStore.deleteItemAsync(MNEMONIC_KEY);
   await SecureStore.deleteItemAsync(PRESENT_KEY);
-  await clearChatIdentity();
+  // Remove any leftover chat material from the previous design (there is no persisted chat key any more).
+  for (const k of ['wayamesh_chat_key', 'wayamesh_chat_card']) {
+    try { await SecureStore.deleteItemAsync(k); } catch { /* not present */ }
+  }
 }
 
 export async function biometricAvailable(): Promise<boolean> {

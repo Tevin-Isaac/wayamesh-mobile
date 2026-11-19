@@ -12,6 +12,7 @@ import { getContacts } from '@/db/chat';
 import { getPolicy, getState, setPolicy } from '@/agent/store';
 import { remaining } from '@/agent/policy';
 import { addInstruction } from '@/agent/instructions';
+import { requireReauth } from '@/utils/reauth';
 import { COLORS, SPACING, RADIUS, FONTS } from '@/constants/theme';
 
 // "Chat with your wallet" — natural language in, mandate-gated action out.
@@ -96,6 +97,8 @@ export default function AgentChatScreen() {
   async function decide(proposal: Proposal, approved: boolean) {
     if (busy) return;
     let outcome: string;
+    // Approving a mandate (spending authority for the agent) loosens protection: fresh biometric/passcode check first.
+    if (approved && proposal.kind !== 'payment' && !(await requireReauth('Confirm the agent mandate'))) approved = false;
     if (!approved) {
       outcome = 'Declined by user.';
     } else if (proposal.kind === 'payment') {

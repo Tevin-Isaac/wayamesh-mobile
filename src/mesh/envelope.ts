@@ -44,6 +44,8 @@ export interface DecodedEnvelope {
   fee?: string;
   /** Voucher only: unix-seconds deadline after which it can no longer settle. */
   deadline?: number;
+  /** Voucher only: invoice / request reference (bytes32 hex; all zeros when unused). */
+  ref?: string;
 }
 
 export function encodeEnvelope(rawSigned: string, courier?: string): string {
@@ -82,6 +84,7 @@ export function decodeEnvelope(payload: string): DecodedEnvelope {
       kind: 'voucher',
       fee: formatUsdc(v.payment.fee),
       deadline: Number(v.payment.deadline),
+      ref: v.payment.ref,
     };
   }
 

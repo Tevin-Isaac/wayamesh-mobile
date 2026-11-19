@@ -1,6 +1,7 @@
 import { Tabs } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS } from '@/constants/theme';
+import { ErrorBoundary } from '@/components/ErrorBoundary';
 
 type IoniconName = React.ComponentProps<typeof Ionicons>['name'];
 
@@ -10,6 +11,7 @@ function TabIcon({ name, color }: { name: IoniconName; color: string }) {
 
 export default function TabsLayout() {
   return (
+    <ErrorBoundary label="this tab">
     <Tabs
       screenOptions={{
         headerShown: false,
@@ -58,5 +60,6 @@ export default function TabsLayout() {
         }}
       />
     </Tabs>
+    </ErrorBoundary>
   );
 }

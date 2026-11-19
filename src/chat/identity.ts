@@ -1,74 +1,92 @@
+import { useSyncExternalStore } from 'react';
 import * as SecureStore from 'expo-secure-store';
-import { ethers } from 'ethers';
-import { buildCard, chatPubkeyOf, deriveChatKey, renameCard, type WalletSigner } from './crypto';
+import { loadWallet } from '@/wallet/keystore';
+import { getMeta, setMeta } from '@/db/chat';
+import { encodeCard, pubkeyOf, toChecksumAddress, addressOfPubkey, type Address, type Hex, type Signer, signerFromKey } from './crypto';
 
-// Phone chat identity. The chat key is derived ONCE from the wallet key (HKDF, info 'wayamesh-chat-v1') the first
-// time the wallet key is in hand, then stored WITHOUT requireAuthentication so incoming messages can be decrypted
-// without a biometric prompt. It is a separate, lower-value key: it can read chat messages but cannot move funds.
-// The signed contact card (public data) is cached next to it.
+// Phone chat identity = the WALLET key (same as the Arc Studio web wallet). The wallet key is biometric-gated, so chat is
+// unlocked ONCE per app session (one biometric prompt when the user opens Chats, sends or pays). While unlocked the key lives
+// only in memory (never written anywhere) and is wiped when the app leaves the foreground, on lock, and on logout.
+// Nothing about chat is persisted unprotected: the previous design's derived chat key (SecureStore) is deleted at first run.
 
-const CHAT_KEY = 'wayamesh_chat_key';
-const CARD_KEY = 'wayamesh_chat_card';
-const OPTS: SecureStore.SecureStoreOptions = {
-  keychainAccessible: SecureStore.AFTER_FIRST_UNLOCK_THIS_DEVICE_ONLY,
-};
-
-let cachedKey: string | null = null;
-
-export async function getChatKey(): Promise<string | null> {
-  if (cachedKey) return cachedKey;
-  try {
-    cachedKey = await SecureStore.getItemAsync(CHAT_KEY, OPTS);
-  } catch {
-    cachedKey = null;
-  }
-  return cachedKey;
+export interface ChatSession {
+  /** wallet private key, 0x hex. In memory only. */
+  privateKey: Hex;
+  address: Address;
+  pubkey: Hex;
+  signer: Signer;
 }
 
-export async function getMyCard(): Promise<string | null> {
-  try {
-    return await SecureStore.getItemAsync(CARD_KEY, OPTS);
-  } catch {
-    return null;
-  }
+let session: ChatSession | null = null;
+let pending: Promise<boolean> | null = null;
+let version = 0;
+const listeners = new Set<() => void>();
+function emit() { version++; listeners.forEach((l) => l()); }
+
+export function getSession(): ChatSession | null { return session; }
+export function isChatUnlocked(): boolean { return session !== null; }
+
+export function subscribeChatLock(l: () => void): () => void {
+  listeners.add(l);
+  return () => { listeners.delete(l); };
+}
+/** React hook: true while the chat key is in memory. */
+export function useChatUnlocked(): boolean {
+  useSyncExternalStore(subscribeChatLock, () => version, () => version);
+  return session !== null;
 }
 
 /**
- * Call whenever the wallet private key is legitimately in memory (create, import, unlock). Derives and stores the
- * chat key and signs the contact card if either is missing. Never throws: chat setup must not break wallet flows.
+ * Runs one biometric auth through the keystore (loadWallet) and keeps the derived chat material in memory.
+ * Resolves false if the user cancels. Concurrent callers share one prompt.
  */
-export async function ensureChatIdentity(walletPrivateKey: string): Promise<void> {
-  try {
-    let key = await getChatKey();
-    if (!key) {
-      key = deriveChatKey(walletPrivateKey);
-      await SecureStore.setItemAsync(CHAT_KEY, key, OPTS);
-      cachedKey = key;
+export function unlockChat(): Promise<boolean> {
+  if (session) return Promise.resolve(true);
+  if (pending) return pending;
+  pending = (async () => {
+    try {
+      const w = await loadWallet();
+      if (!w) return false;
+      const pk = (w.privateKey.startsWith('0x') ? w.privateKey : `0x${w.privateKey}`) as Hex;
+      const pubkey = pubkeyOf(pk);
+      session = { privateKey: pk, address: addressOfPubkey(pubkey), pubkey, signer: signerFromKey(pk) };
+      emit();
+      return true;
+    } catch {
+      return false;
+    } finally {
+      pending = null;
     }
-    if (!(await getMyCard())) {
-      const w = new ethers.Wallet(walletPrivateKey);
-      const signer: WalletSigner = { address: w.address, signMessage: (m) => w.signMessage(m) };
-      await SecureStore.setItemAsync(CARD_KEY, await buildCard(signer, chatPubkeyOf(key), ''), OPTS);
-    }
-  } catch {
-    // retried at the next unlock
+  })();
+  return pending;
+}
+
+/** Wipes the in-memory key (best effort: JS strings cannot be zeroed, so references are dropped). */
+export function lockChat(): void {
+  if (!session) return;
+  session = null;
+  emit();
+}
+
+export function myCardText(): string | null {
+  if (!session) return null;
+  return encodeCard({ address: session.address, pubkey: session.pubkey, name: getMyName() });
+}
+
+export function getMyName(): string {
+  try { return getMeta('my_name') ?? ''; } catch { return ''; }
+}
+export function setMyName(name: string): void {
+  setMeta('my_name', name.trim().slice(0, 24));
+}
+
+const LEGACY_KEYS = ['wayamesh_chat_key', 'wayamesh_chat_card'];
+
+/** Removes the previous design's unprotected derived chat key and cached card. Safe to call on every start. */
+export async function purgeLegacyChatKey(): Promise<void> {
+  for (const k of LEGACY_KEYS) {
+    try { await SecureStore.deleteItemAsync(k); } catch { /* not present */ }
   }
 }
 
-export async function setMyName(name: string): Promise<string | null> {
-  const card = await getMyCard();
-  if (!card) return null;
-  const next = renameCard(card, name.trim());
-  await SecureStore.setItemAsync(CARD_KEY, next, OPTS);
-  return next;
-}
-
-export async function clearChatIdentity(): Promise<void> {
-  cachedKey = null;
-  try {
-    await SecureStore.deleteItemAsync(CHAT_KEY);
-    await SecureStore.deleteItemAsync(CARD_KEY);
-  } catch {
-    // ignore
-  }
-}
+export { toChecksumAddress };
