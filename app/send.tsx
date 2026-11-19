@@ -14,6 +14,7 @@ import { getContacts, getContact, type Contact } from '@/db/chat';
 import { COLORS, SPACING, RADIUS, FONTS } from '@/constants/theme';
 import { groupAddress, lookalike, safeDecimal, unsafeRecipient } from '@/utils/safety';
 import { VOUCHER_TTL_SECONDS } from '@/mesh/voucher';
+import { exact6 } from '@/utils/money';
 
 type Phase = 'entry' | 'review' | 'signing' | 'relaying' | 'done';
 const RESERVE = 0.0001; // tiny gas reserve
@@ -60,10 +61,12 @@ export default function SendScreen() {
   const feeNum = Number(plan.fee);
   // Voucher mode spends from the offline reserve; otherwise from the wallet balance.
   const available = plan.mode === 'voucher' ? reserveNum - feeNum : bal - RESERVE;
-  const insufficient = num > available && num > 0;
+  // A balance we could not read is UNKNOWN, not zero: say so, and don't send a plain transfer we cannot check.
+  const balanceUnknown = plan.mode === 'direct' && balance === null;
+  const insufficient = !balanceUnknown && num > available && num > 0;
   const unsafe = validTo ? unsafeRecipient(to) : null;
   const similar = validTo ? lookalike(to, contacts.map((c) => c.address)) : null;
-  const ready = num > 0 && !insufficient && validTo && !unsafe;
+  const ready = num > 0 && !insufficient && !balanceUnknown && validTo && !unsafe;
 
   function key(k: string) {
     setError('');
@@ -199,10 +202,13 @@ export default function SendScreen() {
         </View>
         <Text style={styles.amountSub}>
           {plan.mode === 'voucher'
-            ? `USDC · $${reserveNum.toFixed(2)} in offline reserve · $${plan.fee} courier fee`
-            : `USDC · ${bal.toFixed(2)} in wallet${reserveNum > 0 ? ' (reserve too low for this amount)' : ''}`}
+            ? `USDC · $${exact6(plan.reserve ?? '0')} in offline reserve · $${plan.fee} courier fee`
+            : `USDC · ${balance !== null ? exact6(balance) : '—'} in wallet${reserveNum > 0 ? ' (reserve too low for this amount)' : ''}`}
         </Text>
         {insufficient && <Text style={styles.amountError}>Insufficient balance</Text>}
+        {balanceUnknown && num > 0 && (
+          <Text style={styles.amountError}>Can’t read your balance right now. Reconnect, or pay from your offline reserve.</Text>
+        )}
         {!!unsafe && <Text style={styles.amountError}>{unsafe}</Text>}
         {!!error && <Text style={styles.amountError}>{error}</Text>}
       </View>

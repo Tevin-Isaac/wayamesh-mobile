@@ -15,6 +15,7 @@ import {
 import { settlePendingVouchers, countPendingVouchers } from '@/wallet/transactions';
 import { WITHDRAW_DELAY_SECONDS, DEFAULT_FEE_UNITS, formatUsdc } from '@/mesh/voucher';
 import { COLORS, SPACING, RADIUS, FONTS } from '@/constants/theme';
+import { exact6 } from '@/utils/money';
 
 // Offline reserve: USDC you pre-load into the MeshPayV2 contract so the
 // payments you sign offline are provably funded. Receivers can verify it.
@@ -92,7 +93,7 @@ export default function ReserveScreen() {
       >
         <View style={styles.hero}>
           <Eyebrow>Offline reserve</Eyebrow>
-          <Text style={styles.big}>${reserve !== null ? Number(reserve).toFixed(2) : '—'}</Text>
+          <Text style={styles.big}>{reserve !== null ? `$${exact6(reserve)}` : '—'}</Text>
           <Text style={styles.sub}>
             {stale ? 'Last known — reconnect to refresh. ' : ''}
             Payments you sign offline are paid from this balance on Arc.
@@ -139,7 +140,7 @@ export default function ReserveScreen() {
           />
         </View>
         <Text style={styles.hint}>
-          Wallet: ${walletBal.toFixed(2)} · Reserve: ${resNum.toFixed(2)}
+          Wallet: {balance !== null ? `$${exact6(balance)}` : '—'} · Reserve: {reserve !== null ? `$${exact6(reserve)}` : '—'}
         </Text>
 
         <TouchableOpacity
@@ -164,7 +165,7 @@ export default function ReserveScreen() {
 
         {withdrawal && (
           <View style={styles.withdrawCard}>
-            <Text style={styles.withdrawTitle}>Withdrawal pending: ${Number(withdrawal.amount).toFixed(2)}</Text>
+            <Text style={styles.withdrawTitle}>Withdrawal pending: ${exact6(withdrawal.amount)}</Text>
             <Text style={styles.withdrawSub}>
               Funds can be finalized {eta(withdrawal.unlockAt)}. The {Math.round(WITHDRAW_DELAY_SECONDS / 3600)}h delay
               protects people you've paid offline — your reserve stays spendable until then.

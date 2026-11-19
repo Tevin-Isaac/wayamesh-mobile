@@ -16,6 +16,7 @@ import {
 import { getSession, unlockChat } from '@/chat/identity';
 import { safetyNumber, type Hex } from '@/chat/crypto';
 import { fmtDecimal, safeDecimal } from '@/utils/safety';
+import { exact6 } from '@/utils/money';
 import { COLORS, SPACING, RADIUS, FONTS } from '@/constants/theme';
 
 export default function ChatThreadScreen() {
@@ -185,7 +186,7 @@ export default function ChatThreadScreen() {
               style={styles.payInput} value={amount} onChangeText={setAmount}
               placeholder="0.00" placeholderTextColor={COLORS.textDim} keyboardType="decimal-pad" autoFocus
             />
-            {!requestMode ? <Text style={styles.payAvail}>{balance ? Number(balance).toFixed(2) : '0.00'} avail</Text> : null}
+            {!requestMode ? <Text style={styles.payAvail}>{balance !== null ? exact6(balance) : '—'} avail</Text> : null}
             <TouchableOpacity style={styles.paySend} onPress={requestMode ? sendRequestMsg : sendPayment} disabled={sending} activeOpacity={0.85}>
               {sending ? <ActivityIndicator color={COLORS.bg} size="small" /> : <Text style={styles.paySendText}>{requestMode ? 'Request' : 'Send USDC'}</Text>}
             </TouchableOpacity>

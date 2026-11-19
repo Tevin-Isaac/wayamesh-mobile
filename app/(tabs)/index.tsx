@@ -1,12 +1,17 @@
-import { View, Text, StyleSheet, ScrollView, RefreshControl, TouchableOpacity, Alert } from 'react-native';
+import { useEffect, useState } from 'react';
+import { View, Text, StyleSheet, ScrollView, RefreshControl, TouchableOpacity, Alert, Linking } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { router } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
+import { useCallback } from 'react';
+import { getMyName } from '@/chat/identity';
 import { Ionicons } from '@expo/vector-icons';
 import { useWallet } from '@/hooks/useWallet';
 import { useTransactions } from '@/hooks/useTransactions';
 import { Avatar, Eyebrow, QuickAction, StatusDot, Sparkline } from '@/components/pro';
 import { copyWithAutoClear } from '@/utils/clipboard';
-import { getCachedReserve } from '@/wallet/meshpay';
+import { getCachedReserve, fetchReserve } from '@/wallet/meshpay';
+import { tryAdd, truncate, exact6 } from '@/utils/money';
+import { ACTIVE_CHAIN } from '@/constants/chain';
 import { COLORS, SPACING, RADIUS, FONTS } from '@/constants/theme';
 import type { TransactionRow } from '@/db/queries';
 
@@ -38,12 +43,38 @@ function ActivityRow({ tx, myAddress }: { tx: TransactionRow; myAddress: string 
 }
 
 export default function WalletScreen() {
-  const { address, balance, isLoading, refresh } = useWallet();
+  const { address, balance, stale, balanceAt, isLoading, refresh } = useWallet();
   const { transactions, pendingCount } = useTransactions();
 
-  const reserveCached = address ? getCachedReserve(address) : null;
-  const bal = balance ? Number(balance) : 0;
-  const [whole, dec] = bal.toFixed(2).split('.');
+  const [myName, setMyNameState] = useState('');
+  useFocusEffect(useCallback(() => { try { setMyNameState(getMyName()); } catch { setMyNameState(''); } }, []));
+
+  // Total balance = what is in the wallet on-chain + what is in the offline reserve (both are yours).
+  // The reserve comes from the cache instantly and is refreshed from chain whenever this screen opens or is pulled.
+  const [reserveAmt, setReserveAmt] = useState<string | null>(null);
+  useEffect(() => {
+    // Always start from THIS address's cache (or nothing), and ignore a fetch that resolves after the address changed.
+    let live = true;
+    setReserveAmt(address ? getCachedReserve(address)?.amount ?? null : null);
+    if (address) {
+      fetchReserve(address)
+        .then((v) => { if (live) setReserveAmt(v); })
+        .catch(() => { /* offline: keep the last known value */ });
+    }
+    return () => { live = false; };
+  }, [address, isLoading]);
+  const reserveCached = reserveAmt !== null ? { amount: reserveAmt } : null;
+  // Exact maths on decimal strings; display truncates (never rounds up). Unknown stays unknown: no made-up zeros.
+  // If the wallet balance is known but the reserve could not be read (offline, never funded), the total shows the
+  // wallet part and says so, instead of hiding a balance we do know.
+  const totalStr = tryAdd(balance, reserveAmt ?? '0');
+  const reservePartial = balance !== null && reserveAmt === null;
+  const [whole, dec] = totalStr ? truncate(totalStr, 2).split('.') : ['—', '--'];
+  const walletExact = balance !== null ? exact6(balance) : null;
+  const reserveExact = reserveAmt !== null ? exact6(reserveAmt) : null;
+  const totalNum = totalStr !== null ? Number(totalStr) : null;
+  const showFaucet = ACTIVE_CHAIN.testnet && !isLoading && totalNum !== null && totalNum < 1;
+  const staleMins = stale && balanceAt ? Math.max(1, Math.round((Date.now() / 1000 - balanceAt) / 60)) : null;
 
   async function copyAddress() {
     if (!address) return;
@@ -69,16 +100,16 @@ export default function WalletScreen() {
       >
         {/* top bar */}
         <View style={styles.topBar}>
-          <View style={styles.topLeft}>
+          <TouchableOpacity style={styles.topLeft} activeOpacity={0.8} onPress={() => router.push('/(tabs)/settings')} accessibilityLabel="Open your wallet profile">
             <Avatar seed={address ?? 'You'} size={40} />
             <View>
               <Text style={styles.greeting}>Welcome back</Text>
-              <Text style={styles.greetingName}>Your wallet</Text>
+              <Text style={styles.greetingName}>{myName || 'Your wallet'}</Text>
             </View>
-          </View>
+          </TouchableOpacity>
           <View style={styles.pill}>
             <View style={styles.liveDot} />
-            <Text style={styles.pillText}>Arc Testnet</Text>
+            <Text style={styles.pillText}>{ACTIVE_CHAIN.name}</Text>
           </View>
         </View>
 
@@ -89,8 +120,30 @@ export default function WalletScreen() {
           <View style={styles.balanceRow}>
             <Text style={styles.balanceSymbol}>$</Text>
             <Text style={styles.balanceWhole}>{isLoading ? '—' : whole}</Text>
-            <Text style={styles.balanceDec}>.{isLoading ? '00' : dec}</Text>
+            <Text style={styles.balanceDec}>.{isLoading ? '--' : dec}</Text>
           </View>
+          <View style={styles.splitRow}>
+            <View style={styles.splitItem}>
+              <Text style={styles.splitLabel}>IN WALLET</Text>
+              <Text style={styles.splitValue}>{isLoading || walletExact === null ? '—' : `$${walletExact}`}</Text>
+            </View>
+            <View style={styles.splitDivider} />
+            <View style={styles.splitItem}>
+              <Text style={styles.splitLabel}>OFFLINE RESERVE</Text>
+              <Text style={styles.splitValue}>{reserveExact === null ? '—' : `$${reserveExact}`}</Text>
+            </View>
+          </View>
+          {!isLoading && stale && (
+            <Text style={styles.staleNote}>
+              Offline · last known{staleMins ? `, ${staleMins < 60 ? `${staleMins} min` : `${Math.round(staleMins / 60)} h`} ago` : ''}
+            </Text>
+          )}
+          {!isLoading && !stale && reservePartial && (
+            <Text style={styles.staleNote}>Offline reserve unavailable right now, so the total shows your wallet balance only.</Text>
+          )}
+          {!isLoading && !stale && balance === null && (
+            <Text style={styles.staleNote}>Can’t reach the network, so the balance is unknown. Pull down to retry.</Text>
+          )}
           <TouchableOpacity onPress={copyAddress} activeOpacity={0.7} style={styles.addrPill}>
             <Ionicons name="copy-outline" size={12} color={COLORS.textMuted} />
             <Text style={styles.addrText}>
@@ -107,10 +160,33 @@ export default function WalletScreen() {
         {/* quick actions */}
         <View style={styles.actions}>
           <QuickAction icon="arrow-up" label="Send" primary onPress={() => router.push('/send')} />
-          <QuickAction icon="qr-code-outline" label="Request" onPress={() => router.push('/receive')} />
           <QuickAction icon="arrow-down" label="Receive" onPress={() => router.push('/receive')} />
           <QuickAction icon="scan-outline" label="Scan" onPress={() => router.push('/scan')} />
+          <QuickAction icon="add" label="Add" onPress={() => router.push('/ramp')} />
         </View>
+
+        {/* test USDC (testnet only) */}
+        {showFaucet && (
+          <View style={styles.faucetCard}>
+            <View style={styles.faucetHead}>
+              <Ionicons name="water-outline" size={18} color={COLORS.accent} />
+              <Text style={styles.faucetTitle}>Get free test USDC</Text>
+            </View>
+            <Text style={styles.faucetBody}>
+              This is a test network, so the money is free. Open the Circle faucet, choose {ACTIVE_CHAIN.name} and USDC, and paste your address.
+            </Text>
+            <View style={styles.faucetBtns}>
+              <TouchableOpacity style={styles.faucetBtn} onPress={copyAddress} activeOpacity={0.8}>
+                <Ionicons name="copy-outline" size={16} color={COLORS.accent} />
+                <Text style={styles.faucetBtnText}>Copy my address</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={[styles.faucetBtn, styles.faucetBtnPrimary]} onPress={() => Linking.openURL(ACTIVE_CHAIN.faucet ?? 'https://faucet.circle.com')} activeOpacity={0.85}>
+                <Ionicons name="open-outline" size={16} color={COLORS.bg} />
+                <Text style={[styles.faucetBtnText, { color: COLORS.bg }]}>Open faucet</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        )}
 
         {/* offline reserve (MeshPayV2) */}
         <TouchableOpacity activeOpacity={0.8} onPress={() => router.push('/reserve')}>
@@ -119,20 +195,8 @@ export default function WalletScreen() {
             <View style={{ flex: 1 }}>
               <Text style={styles.meshTitle}>Offline reserve</Text>
               <Text style={styles.meshSub}>
-                {reserveCached ? `$${Number(reserveCached.amount).toFixed(2)} backing your offline payments` : 'Pre-fund so offline payments are verifiably backed'}
+                {reserveCached ? `$${exact6(reserveCached.amount)} backing your offline payments` : 'Pre-fund so offline payments are verifiably backed'}
               </Text>
-            </View>
-            <Ionicons name="chevron-forward" size={20} color={COLORS.textDim} />
-          </View>
-        </TouchableOpacity>
-
-        {/* add money / cash out */}
-        <TouchableOpacity activeOpacity={0.8} onPress={() => router.push('/ramp')}>
-          <View style={[styles.card, styles.meshCard]}>
-            <View style={styles.meshIcon}><Ionicons name="card-outline" size={20} color={COLORS.accent} /></View>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.meshTitle}>Add money · Cash out</Text>
-              <Text style={styles.meshSub}>Top up with USDC or withdraw to your bank</Text>
             </View>
             <Ionicons name="chevron-forward" size={20} color={COLORS.textDim} />
           </View>
@@ -184,6 +248,26 @@ export default function WalletScreen() {
 }
 
 const styles = StyleSheet.create({
+  staleNote: { fontSize: 12, color: COLORS.warning, textAlign: 'center', marginTop: 8, paddingHorizontal: SPACING.md },
+  faucetCard: {
+    backgroundColor: COLORS.accentSoft, borderWidth: 1, borderColor: 'rgba(62,217,184,0.28)', borderRadius: RADIUS.lg,
+    padding: SPACING.md, gap: 10, marginBottom: SPACING.sm,
+  },
+  faucetHead: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  faucetTitle: { fontSize: 15, fontWeight: '700', color: COLORS.text },
+  faucetBody: { fontSize: 13, color: COLORS.textMuted, lineHeight: 19 },
+  faucetBtns: { flexDirection: 'row', gap: 10 },
+  faucetBtn: {
+    flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7, paddingVertical: 11,
+    borderRadius: RADIUS.md, borderWidth: 1, borderColor: 'rgba(62,217,184,0.4)',
+  },
+  faucetBtnPrimary: { backgroundColor: COLORS.accent, borderColor: COLORS.accent },
+  faucetBtnText: { fontSize: 13.5, fontWeight: '700', color: COLORS.accent },
+  splitRow: { flexDirection: 'row', alignItems: 'center', gap: 18, marginTop: 14, marginBottom: 4 },
+  splitItem: { alignItems: 'center', gap: 2 },
+  splitLabel: { fontSize: 10, letterSpacing: 1.2, color: COLORS.textDim, fontFamily: FONTS.mono },
+  splitValue: { fontSize: 15, color: COLORS.text, fontFamily: FONTS.mono, fontWeight: '700' },
+  splitDivider: { width: 1, height: 26, backgroundColor: COLORS.border },
   container: { flex: 1, backgroundColor: COLORS.bg },
   scroll: { padding: SPACING.lg, paddingBottom: SPACING.xxl },
 

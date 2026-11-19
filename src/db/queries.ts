@@ -70,6 +70,7 @@ export function clearWalletData(): void {
   wipe('DELETE FROM app_settings');
   wipe('DELETE FROM nonce_cache');
   wipe('DELETE FROM reserve_cache');
+  wipe('DELETE FROM balance_cache');
   wipe("UPDATE pin_security SET attempt_count = 0, locked_until = 0 WHERE id = 1");
 }
 

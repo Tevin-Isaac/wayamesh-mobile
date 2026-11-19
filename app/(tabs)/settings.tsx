@@ -4,11 +4,13 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useState, useEffect } from 'react';
-import { router } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
+import { useCallback } from 'react';
+import { getMyName } from '@/chat/identity';
+import { copyWithAutoClear } from '@/utils/clipboard';
 import Constants from 'expo-constants';
 import { Ionicons } from '@expo/vector-icons';
 import { Avatar, Eyebrow } from '@/components/pro';
-import { Badge } from '@/components/ui/Badge';
 import { COLORS, SPACING, RADIUS, FONTS } from '@/constants/theme';
 import { ACTIVE_CHAIN } from '@/constants/chain';
 import { useWallet } from '@/hooks/useWallet';
@@ -48,6 +50,13 @@ export default function SettingsScreen() {
   const [autoSettle, setAutoSettleState] = useState(true);
   const [langCode, setLangCode] = useState<LanguageCode>('en');
   const [langPicker, setLangPicker] = useState(false);
+  const [myName, setMyNameState] = useState('');
+  useFocusEffect(useCallback(() => { try { setMyNameState(getMyName()); } catch { setMyNameState(''); } }, []));
+  async function copyMyAddress() {
+    if (!address) return;
+    await copyWithAutoClear(address, 30_000);
+    Alert.alert('Copied', 'Address copied. It clears from your clipboard in 30 seconds.');
+  }
 
   useEffect(() => {
     try {
@@ -109,14 +118,33 @@ export default function SettingsScreen() {
       <ScrollView contentContainerStyle={styles.content}>
         <Text style={styles.heading}>Settings</Text>
 
-        {/* account header */}
-        <View style={styles.accountHeader}>
-          <Avatar seed={address ?? 'You'} size={56} />
-          <View style={{ flex: 1 }}>
-            <Text style={styles.accountName}>Your wallet</Text>
-            <Text style={styles.accountAddr}>{short}</Text>
+        {/* wallet profile */}
+        <View style={styles.profileCard}>
+          <View style={styles.profileTop}>
+            <View style={styles.avatarRing}>
+              <Avatar seed={address ?? 'You'} size={64} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.profileName} numberOfLines={1}>{myName || 'Your wallet'}</Text>
+              <TouchableOpacity onPress={copyMyAddress} activeOpacity={0.7} style={styles.profileAddrRow}>
+                <Text style={styles.profileAddr}>{short}</Text>
+                <Ionicons name="copy-outline" size={13} color={COLORS.textMuted} />
+              </TouchableOpacity>
+              <View style={styles.profileChips}>
+                <View style={styles.liveChip}><View style={styles.liveDot} /><Text style={styles.liveChipText}>{ACTIVE_CHAIN.name}</Text></View>
+              </View>
+            </View>
           </View>
-          <Badge status="accent">Arc</Badge>
+          <View style={styles.profileActions}>
+            <TouchableOpacity style={styles.profileBtn} onPress={() => router.push('/my-card')} activeOpacity={0.8}>
+              <Ionicons name="id-card-outline" size={17} color={COLORS.accent} />
+              <Text style={styles.profileBtnText}>{myName ? 'Edit name & card' : 'Set your name'}</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.profileBtn} onPress={copyMyAddress} activeOpacity={0.8}>
+              <Ionicons name="copy-outline" size={17} color={COLORS.accent} />
+              <Text style={styles.profileBtnText}>Copy address</Text>
+            </TouchableOpacity>
+          </View>
         </View>
 
         <Eyebrow style={styles.eyebrow}>Security</Eyebrow>
@@ -153,11 +181,13 @@ export default function SettingsScreen() {
 
         <Eyebrow style={styles.eyebrow}>Network</Eyebrow>
         <View style={styles.group}>
-          <Row icon="globe-outline" label="Network" value="Arc Testnet" />
+          <Row icon="globe-outline" label="Network" value={ACTIVE_CHAIN.name} />
           <HR />
           <Row icon="git-network-outline" label="Chain ID" value={String(ACTIVE_CHAIN.chainId)} />
           <HR />
-          <Row icon="water-outline" label="Get testnet USDC" chevron onPress={() => Linking.openURL('https://faucet.circle.com')} />
+          {ACTIVE_CHAIN.testnet && (
+            <Row icon="water-outline" label="Get test USDC" value="Free, from Circle" chevron onPress={() => Linking.openURL(ACTIVE_CHAIN.faucet ?? 'https://faucet.circle.com')} />
+          )}
         </View>
 
         <Eyebrow style={styles.eyebrow}>Wallet</Eyebrow>
@@ -170,7 +200,7 @@ export default function SettingsScreen() {
         <TouchableOpacity style={styles.signOut} onPress={confirmLogout} activeOpacity={0.85}>
           <Text style={styles.signOutText}>Sign Out</Text>
         </TouchableOpacity>
-        <Text style={styles.about}>Wayamesh · v{Constants.expoConfig?.version ?? '?'} · Built on Arc · Testnet</Text>
+        <Text style={styles.about}>Wayamesh · v{Constants.expoConfig?.version ?? '?'} · Built on Arc{ACTIVE_CHAIN.testnet ? ' · Testnet' : ''}</Text>
       </ScrollView>
 
       {/* language picker */}
@@ -201,6 +231,29 @@ export default function SettingsScreen() {
 }
 
 const styles = StyleSheet.create({
+  profileCard: {
+    backgroundColor: COLORS.surface, borderWidth: 1, borderColor: COLORS.border, borderRadius: RADIUS.lg,
+    padding: SPACING.md, gap: SPACING.md, marginBottom: SPACING.sm,
+  },
+  profileTop: { flexDirection: 'row', alignItems: 'center', gap: 14 },
+  avatarRing: { padding: 3, borderRadius: 999, borderWidth: 1.5, borderColor: COLORS.accent },
+  profileName: { fontSize: 19, fontWeight: '700', color: COLORS.text, letterSpacing: -0.3 },
+  profileAddrRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 3 },
+  profileAddr: { fontSize: 13, color: COLORS.textMuted, fontFamily: FONTS.mono },
+  profileChips: { flexDirection: 'row', marginTop: 8 },
+  liveChip: {
+    flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 10, paddingVertical: 4,
+    borderRadius: 999, backgroundColor: COLORS.accentSoft,
+  },
+  liveDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: COLORS.accent },
+  liveChipText: { fontSize: 11.5, color: COLORS.accent, fontWeight: '600' },
+  profileActions: { flexDirection: 'row', gap: 10 },
+  profileBtn: {
+    flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
+    paddingVertical: 11, borderRadius: RADIUS.md, borderWidth: 1, borderColor: COLORS.border, backgroundColor: COLORS.bg,
+  },
+  profileBtnText: { fontSize: 13.5, color: COLORS.text, fontWeight: '600' },
+
   container: { flex: 1, backgroundColor: COLORS.bg },
   content: { padding: SPACING.lg, paddingBottom: SPACING.xxl },
   heading: { fontSize: 28, fontWeight: '700', color: COLORS.text, marginBottom: SPACING.lg, letterSpacing: -0.3 },
