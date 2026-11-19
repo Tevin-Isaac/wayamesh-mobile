@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
 import {
-  View, Text, StyleSheet, TouchableOpacity, ScrollView, Alert,
+  View, Text, StyleSheet, TouchableOpacity, ScrollView, Alert, TextInput,
 } from 'react-native';
+import { router, useLocalSearchParams, useNavigation } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as ScreenCapture from 'expo-screen-capture';
 import { Ionicons } from '@expo/vector-icons';
@@ -13,6 +14,20 @@ export default function BackupScreen() {
   const [mnemonic, setMnemonic] = useState<string | null>(null);
   const [loading, setLoading]   = useState(true);
   const [hidden, setHidden]     = useState(true);
+  // First-run mode (right after Create Wallet): the user must see the phrase and prove they wrote it down.
+  const { first } = useLocalSearchParams<{ first?: string }>();
+  const firstRun = first === '1';
+  const [step, setStep] = useState<'show' | 'confirm'>('show');
+  const [positions, setPositions] = useState<number[]>([]);
+  const [answers, setAnswers] = useState<string[]>(['', '', '']);
+  const [confirmError, setConfirmError] = useState('');
+  const [authFailed, setAuthFailed] = useState(false);
+
+  // In first-run mode the screen must not be dismissed by a swipe: the backup is part of creating the wallet.
+  const navigation = useNavigation();
+  useEffect(() => {
+    if (firstRun) navigation.setOptions({ gestureEnabled: false, headerBackVisible: false });
+  }, [firstRun, navigation]);
 
   // Block screenshots while this screen is mounted (seed phrase is sensitive)
   useEffect(() => {
@@ -29,6 +44,16 @@ export default function BackupScreen() {
     const phrase = await loadMnemonic();
     setLoading(false);
 
+    // Right after Create Wallet the phrase always exists, so null here means the biometric check was cancelled or
+    // failed. Never skip the backup: ask again.
+    if (phrase === null && firstRun) { setAuthFailed(true); return; }
+    setAuthFailed(false);
+    if (phrase !== null) {
+      const n = phrase.trim().split(/\s+/).length;
+      const set = new Set<number>();
+      while (set.size < 3) set.add(Math.floor(Math.random() * n));
+      setPositions([...set].sort((x, y) => x - y));
+    }
     if (phrase === null) {
       Alert.alert(
         'No Seed Phrase',
@@ -48,7 +73,13 @@ export default function BackupScreen() {
     );
   }
 
-  const words = mnemonic ? mnemonic.split(' ') : [];
+  const words = mnemonic ? mnemonic.trim().split(/\s+/) : [];
+
+  function checkAnswers() {
+    const ok = positions.every((pos, i) => (answers[i] ?? '').trim().toLowerCase() === words[pos]);
+    if (!ok) { setConfirmError('Those words do not match your recovery phrase. Check the phrase and try again.'); return; }
+    router.replace('/pin-setup');
+  }
 
   return (
     <SafeAreaView style={styles.container} edges={['bottom']}>
@@ -61,7 +92,41 @@ export default function BackupScreen() {
           </Text>
         </View>
 
-        {loading ? (
+        {firstRun && authFailed ? (
+          <View style={styles.noPhrase}>
+            <Ionicons name="finger-print-outline" size={40} color={COLORS.textMuted} />
+            <Text style={styles.noPhraseText}>Unlock to see your recovery phrase</Text>
+            <Text style={styles.noPhraseHint}>
+              Your wallet is created, but it isn’t backed up yet. Authenticate to see your phrase and write it down.
+            </Text>
+            <TouchableOpacity style={styles.copyBtn} onPress={reveal} activeOpacity={0.85}>
+              <Text style={styles.copyBtnText}>Try again</Text>
+            </TouchableOpacity>
+          </View>
+        ) : firstRun && step === 'confirm' && mnemonic ? (
+          <View style={styles.confirmBox}>
+            <Text style={styles.confirmTitle}>Check your backup</Text>
+            <Text style={styles.tip}>Type these words from your recovery phrase to prove you saved it.</Text>
+            {positions.map((pos, i) => (
+              <View key={pos} style={styles.confirmRow}>
+                <Text style={styles.confirmLabel}>Word {pos + 1}</Text>
+                <TextInput
+                  style={styles.confirmInput}
+                  value={answers[i]}
+                  onChangeText={(t) => { setConfirmError(''); setAnswers((a) => a.map((v, k) => (k === i ? t : v))); }}
+                  autoCapitalize="none" autoCorrect={false} placeholder="word" placeholderTextColor={COLORS.textDim}
+                />
+              </View>
+            ))}
+            {!!confirmError && <Text style={styles.confirmError}>{confirmError}</Text>}
+            <TouchableOpacity style={styles.copyBtn} onPress={checkAnswers} activeOpacity={0.85}>
+              <Text style={styles.copyBtnText}>Confirm and continue</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.hideBtn} onPress={() => { setStep('show'); setHidden(false); }} activeOpacity={0.7}>
+              <Text style={styles.hideBtnText}>Back to my phrase</Text>
+            </TouchableOpacity>
+          </View>
+        ) : loading ? (
           <Text style={styles.loadingText}>Authenticating…</Text>
         ) : mnemonic ? (
           <>
@@ -98,6 +163,16 @@ export default function BackupScreen() {
             <Text style={styles.tip}>
               Write these {words.length} words on paper in order and store them somewhere secure offline. Do not save them in a notes app, cloud storage, or take a screenshot.
             </Text>
+            {firstRun && (
+              <TouchableOpacity
+                style={[styles.copyBtn, hidden && { opacity: 0.4 }]}
+                disabled={hidden}
+                onPress={() => { setHidden(true); setStep('confirm'); }}
+                activeOpacity={0.85}
+              >
+                <Text style={styles.copyBtnText}>I have written it down</Text>
+              </TouchableOpacity>
+            )}
           </>
         ) : (
           <View style={styles.noPhrase}>
@@ -157,6 +232,15 @@ const styles = StyleSheet.create({
     fontSize: 12, color: COLORS.textDim, lineHeight: 18,
     textAlign: 'center', paddingHorizontal: SPACING.sm,
   },
+  confirmBox: { gap: SPACING.md },
+  confirmTitle: { fontSize: 20, fontWeight: '700', color: COLORS.text, textAlign: 'center' },
+  confirmRow: { gap: 6 },
+  confirmLabel: { fontSize: 12, color: COLORS.textMuted },
+  confirmInput: {
+    backgroundColor: COLORS.surface, borderWidth: 1, borderColor: COLORS.border, borderRadius: RADIUS.md,
+    paddingHorizontal: SPACING.md, paddingVertical: 14, color: COLORS.text, fontSize: 16,
+  },
+  confirmError: { color: COLORS.error, fontSize: 13, textAlign: 'center' },
   noPhrase: { alignItems: 'center', gap: SPACING.sm, paddingVertical: SPACING.xl },
   noPhraseText: { fontSize: 16, color: COLORS.textMuted, fontWeight: '600' },
   noPhraseHint: { fontSize: 13, color: COLORS.textDim, textAlign: 'center', lineHeight: 20 },

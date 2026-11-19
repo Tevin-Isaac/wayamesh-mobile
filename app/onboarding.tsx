@@ -38,7 +38,8 @@ export default function OnboardingScreen() {
 
   async function handleCreate() {
     await create();
-    router.replace('/pin-setup');
+    // A new wallet must be backed up first: show the recovery phrase, confirm three words, then set the backup passphrase.
+    router.replace({ pathname: '/backup', params: { first: '1' } });
   }
 
   return (
