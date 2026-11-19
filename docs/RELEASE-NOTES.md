@@ -1,8 +1,31 @@
+# Release notes 1.2.0-beta.1 (Android versionCode 3, iOS build 3)
+
+Testnet beta. Not independently audited. **Do not use with real money.** Needs a fresh install: it adds native modules, so it
+is not delivered as an over-the-air update to 1.1.0.
+
+## What changed in 1.2.0
+
+* **Optional external wallet.** Settings → External wallet (optional): connect MetaMask, Trust Wallet or another wallet app
+  (WalletConnect / Reown) and top up this wallet from it. It is not part of the core wallet, loads only on that screen, and the
+  app works fully without it. Not yet tried against a real wallet app on a device.
+* **Exact balances.** Total balance is wallet plus offline reserve, truncated and never rounded up; an unreadable balance shows
+  a dash or a last-known value, never a made-up zero.
+* **Recovery phrase on create.** A new wallet must show and confirm its recovery phrase before anything else.
+* **Real Online / Offline indicator** on the home bar, driven by the phone's actual network state (including Wi-Fi with no
+  internet). The avatar button is gone; the profile lives in Settings.
+* **Contacts** stay until you delete them (press and hold, or the conversation menu). After paying someone you scanned or pasted,
+  you can save them in one tap.
+* **Get free test USDC** card on the home screen (testnet only).
+* Home actions are now Send, Receive, Scan, Add.
+
+## Not tested on devices (1.2.0)
+
+External wallet connection with a real wallet app, Bluetooth hand-off and chat between two phones, and the new onboarding on a
+physical phone.
+
 # Release notes 1.1.0-beta.1 (Android versionCode 2, iOS build 2)
 
-Testnet beta. Not independently audited. **Do not use with real money.**
-
-## What changed
+## What changed in 1.1.0
 
 * **Offline payments are MeshPayV2 reserve vouchers** (`mp2:`): EIP-712 signed, backed by an on-chain reserve, any phone can
   settle and keep the 0.01 USDC courier fee. Signature vectors match the web wallet.
