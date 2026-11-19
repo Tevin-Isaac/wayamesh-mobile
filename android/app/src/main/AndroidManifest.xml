@@ -23,6 +23,18 @@
       <category android:name="android.intent.category.BROWSABLE"/>
       <data android:scheme="https"/>
     </intent>
+    <!-- Optional external-wallet feature: lets the app see which wallet apps are installed and open them (WalletConnect). -->
+    <intent>
+      <action android:name="android.intent.action.VIEW"/>
+      <data android:scheme="wc"/>
+    </intent>
+    <package android:name="io.metamask"/>
+    <package android:name="com.wallet.crypto.trustapp"/>
+    <package android:name="me.rainbow"/>
+    <package android:name="org.toshi"/>
+    <package android:name="io.zerion.android"/>
+    <package android:name="im.token.app"/>
+    <package android:name="com.okinc.okex.gp"/>
   </queries>
   <application android:name=".MainApplication" android:label="@string/app_name" android:icon="@mipmap/ic_launcher" android:roundIcon="@mipmap/ic_launcher_round" android:allowBackup="true" android:theme="@style/AppTheme" android:supportsRtl="true" android:enableOnBackInvokedCallback="false" android:fullBackupContent="@xml/secure_store_backup_rules" android:dataExtractionRules="@xml/secure_store_data_extraction_rules">
     <meta-data android:name="expo.modules.updates.ENABLED" android:value="true"/>

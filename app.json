@@ -2,7 +2,7 @@
   "expo": {
     "name": "Wayamesh",
     "slug": "wayamesh-mobile",
-    "version": "1.1.0-beta.1",
+    "version": "1.2.0-beta.1",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "dark",
@@ -20,7 +20,7 @@
         "NSCameraUsageDescription": "Wayamesh uses the camera to scan payment, contact and message QR codes.",
         "ITSAppUsesNonExemptEncryption": false
       },
-      "buildNumber": "2",
+      "buildNumber": "3",
       "config": {
         "usesNonExemptEncryption": false
       }
@@ -42,7 +42,7 @@
         "android.permission.USE_FINGERPRINT",
         "android.permission.CAMERA"
       ],
-      "versionCode": 2
+      "versionCode": 3
     },
     "scheme": "wayamesh",
     "platforms": [
@@ -91,7 +91,7 @@
       }
     },
     "owner": "tevinprime66",
-    "runtimeVersion": "1.1.0",
+    "runtimeVersion": "1.2.0",
     "updates": {
       "url": "https://u.expo.dev/de5243ef-44ee-472f-8322-f928b3013f0a",
       "fallbackToCacheTimeout": 0

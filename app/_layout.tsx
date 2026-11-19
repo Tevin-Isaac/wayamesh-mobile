@@ -259,6 +259,10 @@ export default function RootLayout() {
           name="ramp"
           options={{ presentation: 'modal', headerTitle: 'Add money', ...MODAL_HEADER }}
         />
+        <Stack.Screen
+          name="external-wallet"
+          options={{ presentation: 'modal', headerTitle: 'External wallet (optional)', ...MODAL_HEADER }}
+        />
       </Stack>
       </ErrorBoundary>
     </SafeAreaProvider>

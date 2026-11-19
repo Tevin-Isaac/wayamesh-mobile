@@ -165,6 +165,11 @@ export default function SettingsScreen() {
           <Row icon="cloud-upload-outline" label="Cloud backup" value="PIN protected" chevron onPress={() => router.push('/pin-setup')} />
         </View>
 
+        <Eyebrow style={styles.eyebrow}>Optional</Eyebrow>
+        <View style={styles.group}>
+          <Row icon="link-outline" label="External wallet" value="Optional" chevron onPress={() => router.push('/external-wallet')} />
+        </View>
+
         <Eyebrow style={styles.eyebrow}>Gasless USDC · Beta</Eyebrow>
         <View style={styles.group}>
           <Row icon="card-outline" label="Smart account" value="Gas in USDC" chevron onPress={() => router.push('/smart-account')} />
